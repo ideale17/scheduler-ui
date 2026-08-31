@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-import axios from 'axios'
+import http from '@/api/http'
 import { useRouter, useRoute } from 'vue-router'
 
 const router = useRouter()
@@ -13,7 +13,10 @@ const login = async () => {
   err.value = ''
   try {
     // 세션 발급
-    await axios.post('/auth/login', { username: username.value, password: password.value })
+    await http.post('/auth/login', {
+      username: username.value,
+      password: password.value,
+    })
     // 돌아갈 곳 있으면 그리, 없으면 홈
     const redirect = route.query.redirect?.toString() || '/'
     router.replace(redirect)

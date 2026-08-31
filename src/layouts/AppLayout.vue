@@ -1,7 +1,7 @@
 <script setup>
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { computed, ref, onMounted } from 'vue'
-import axios from 'axios'
+import http from '@/api/http'
 
 const route = useRoute()
 const router = useRouter()
@@ -21,7 +21,7 @@ const pageTitle = computed(() => route.meta.title || '')
 const username = ref(null)
 onMounted(async () => {
   try {
-    const { data } = await axios.get('http://localhost:8080/auth/me')
+    const { data } = await http.get('http://localhost:8080/auth/me')
     username.value = data?.username ?? null
   } catch {
     username.value = null
@@ -30,7 +30,7 @@ onMounted(async () => {
 
 const logout = async () => {
   try {
-    await axios.post('http://localhost:8080/auth/logout')
+    await http.post('http://localhost:8080/auth/logout')
   } finally {
     router.push('/login') // 세션 파기 후 로그인 화면으로
   }

@@ -1,26 +1,10 @@
-// import { createRouter, createWebHistory } from 'vue-router'
-// import JobList from '@/components/JobList.vue'
-// import AddJobForm from '@/components/AddJobForm.vue'
-
-// const routes = [
-//   { path: '/', name: 'JobList', component: JobList },
-//   { path: '/add', name: 'AddJob', component: AddJobForm },
-// ]
-
-// const router = createRouter({
-//   history: createWebHistory(),
-//   routes,
-// })
-
-// export default router
-
 import { createRouter, createWebHistory } from 'vue-router'
 import AppLayout from '@/layouts/AppLayout.vue'
 import JobList from '@/pages/JobList.vue'
 import AddJobForm from '@/pages/AddJobForm.vue'
 import JobHistory from '@/pages/JobHistory.vue'
 import Login from '@/pages/Login.vue'
-import axios from 'axios'
+import http from '@/api/http'
 
 const SettingsView = () => import('@/pages/SettingsView.vue')
 
@@ -57,8 +41,11 @@ router.beforeEach(async (to, from, next) => {
     // 로그인 페이지에 이미 로그인 상태로 들어오면 홈으로
     if (to.path === '/login') {
       try {
-        const { data } = await axios.get('/auth/me')
-        if (data?.username) return next('/')
+        const { data } = await http.get('/auth/me')
+
+        if (data?.username) {
+          return next('/')
+        }
       } catch {
         /* unauthenticated or /auth/me failed: fall through */
       }
@@ -67,8 +54,10 @@ router.beforeEach(async (to, from, next) => {
   }
 
   try {
-    const { data } = await axios.get('/auth/me')
-    if (data?.username) return next()
+    const { data } = await http.get('/auth/me')
+    if (data?.username) {
+      return next()
+    }
   } catch {
     /* unauthenticated or /auth/me failed: fall through */
   }

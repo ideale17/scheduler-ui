@@ -1,34 +1,97 @@
 <script setup>
-import { ref } from 'vue'
-import axios from 'axios'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { createJob, getJobClasses } from '@/api/jobApi'
 
 const router = useRouter()
+const jobClasses = ref([])
+
+// const jobData = ref({
+//   jobClassName: 'com.kji.scheduler.job.WeatherCollectJob',
+//   jobName: 'test',
+//   jobGroup: 'test',
+//   scheduleType: 'SIMPLE',
+//   scheduleExpr: '60',
+//   params: {
+//     baseDate: '20250807',
+//     baseTime: '1000',
+//     nx: '55',
+//     ny: '127',
+//   },
+// })
 
 const jobData = ref({
-  jobClassName: 'com.kji.scheduler.job.WeatherCollectJob',
-  jobName: 'test',
-  jobGroup: 'test',
-  scheduleType: 'SIMPLE',
-  scheduleExpr: '60',
-  params: {
-    baseDate: '20250807',
-    baseTime: '1000',
-    nx: '55',
-    ny: '127',
-  },
+  jobClassName: '',
+  jobName: '',
+  jobGroup: '',
+  scheduleType: 'CRON',
+  scheduleExpr: '',
+  params: {},
+})
+
+const loadJobClasses = async () => {
+  try {
+    const response = await getJobClasses()
+
+    jobClasses.value = response.data
+  } catch (error) {
+    console.error('Job 클래스 목록 조회 실패:', error)
+    alert('Job 클래스 목록을 불러오지 못했습니다.')
+  }
+}
+
+onMounted(() => {
+  loadJobClasses()
 })
 
 const addJob = async () => {
-  try {
-    const response = await axios.post('http://localhost:8080/jobs/addJob', jobData.value)
-    alert('✅ Job 등록 성공')
-    console.log(response.data)
-    router.push('/') // 목록 화면으로 이동
-  } catch (error) {
-    console.error('❌ 등록 실패:', error)
-    alert('❌ Job 등록 실패')
+  // 1. 입력값을 검증한다.
+  if (!validateJob()) {
+    return
   }
+
+  try {
+    // 2. Job 등록 API를 호출한다.
+    const response = await createJob(jobData.value)
+
+    // 3. 등록 성공 후 목록 화면으로 이동한다.
+    alert('Job 등록 성공')
+    console.log(response.data)
+
+    router.push('/')
+  } catch (error) {
+    console.error('Job 등록 실패:', error)
+    alert('Job 등록에 실패했습니다.')
+  }
+}
+
+const validateJob = () => {
+  if (!jobData.value.jobClassName.trim()) {
+    alert('Job 클래스를 선택해주세요.')
+    return false
+  }
+
+  if (!jobData.value.jobName.trim()) {
+    alert('Job 이름을 입력해주세요.')
+    return false
+  }
+
+  if (!jobData.value.jobGroup.trim()) {
+    alert('Job 그룹을 입력해주세요.')
+    return false
+  }
+
+  if (!jobData.value.scheduleType) {
+    alert('스케줄 유형을 선택해주세요.')
+    return false
+  }
+
+  if (!jobData.value.scheduleExpr.trim()) {
+    alert('스케줄 표현식을 입력해주세요.')
+    return false
+  }
+
+  return true
 }
 </script>
 
@@ -39,8 +102,12 @@ const addJob = async () => {
     <form @submit.prevent="addJob" class="space-y-4">
       <div>
         <label class="block font-semibold">Job Class Name</label>
-        <select v-model="jobData.jobClassName" class="input">
-          <option value="com.kji.scheduler.job.WeatherCollectJob">WeatherCollectJob</option>
+        <select v-model="jobData.jobClassName">
+          <option value="" disabled>Job 클래스를 선택해주세요.</option>
+
+          <option v-for="jobClass in jobClasses" :key="jobClass" :value="jobClass">
+            {{ jobClass }}
+          </option>
         </select>
       </div>
 
