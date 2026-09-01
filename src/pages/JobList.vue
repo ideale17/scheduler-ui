@@ -1,6 +1,6 @@
 <script setup>
 import { onMounted, ref } from 'vue'
-import axios from 'axios'
+import http from '@/api/http'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -8,7 +8,7 @@ const jobList = ref([])
 
 const fetchJobList = async () => {
   try {
-    const response = await axios.get('http://localhost:8080/jobs/listJobs')
+    const response = await http.get('/jobs/listJobs')
     console.log('📦 응답:', response.data)
     jobList.value = Array.isArray(response.data) ? response.data : []
   } catch (error) {
@@ -25,7 +25,7 @@ const deleteJob = async (jobName, jobGroup) => {
   if (!confirm(`정말 ${jobGroup} 그룹의 ${jobName} Job을 삭제하시겠습니까?`)) return
 
   try {
-    await axios.delete('http://localhost:8080/jobs/deleteJob', {
+    await http.delete('/jobs/deleteJob', {
       params: {
         jobName,
         jobGroup,
@@ -45,7 +45,7 @@ const pauseJob = async (jobName, jobGroup) => {
   if (!confirm(`⏸️ ${jobGroup} 그룹의 ${jobName} Job을 중지하시겠습니까?`)) return
 
   try {
-    await axios.post('http://localhost:8080/jobs/pauseJob', null, {
+    await http.post('/jobs/pauseJob', null, {
       params: {
         jobName: jobName,
         jobGroup: jobGroup,
@@ -63,7 +63,7 @@ const resumeJob = async (jobName, jobGroup) => {
   if (!confirm(`⏸️ ${jobGroup} 그룹의 ${jobName} Job을 재시작하시겠습니까?`)) return
 
   try {
-    await axios.post('http://localhost:8080/jobs/resumeJob', null, {
+    await http.post('/jobs/resumeJob', null, {
       params: {
         jobName: jobName,
         jobGroup: jobGroup,

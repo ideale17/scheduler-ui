@@ -102,7 +102,7 @@ const validateJob = () => {
     <form @submit.prevent="addJob" class="space-y-4">
       <div>
         <label class="block font-semibold">Job Class Name</label>
-        <select v-model="jobData.jobClassName">
+        <select v-model="jobData.jobClassName" class="input">
           <option value="" disabled>Job 클래스를 선택해주세요.</option>
 
           <option v-for="jobClass in jobClasses" :key="jobClass" :value="jobClass">

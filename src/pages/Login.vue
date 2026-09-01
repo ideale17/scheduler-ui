@@ -27,11 +27,19 @@ const login = async () => {
 </script>
 
 <template>
-  <div class="p-6 max-w-sm mx-auto space-y-3">
-    <h2 class="text-xl font-bold">로그인</h2>
-    <input v-model="username" placeholder="아이디" class="border p-2 w-full" />
-    <input v-model="password" type="password" placeholder="비밀번호" class="border p-2 w-full" />
-    <button @click="login" class="border p-2 w-full">로그인</button>
-    <p v-if="err" class="text-red-500 text-sm">{{ err }}</p>
+  <div class="p-6 max-w-sm mx-auto">
+    <form class="space-y-3" @submit.prevent="login">
+      <h2 class="text-xl font-bold">로그인</h2>
+
+      <input v-model="username" placeholder="아이디" class="border p-2 w-full" />
+
+      <input v-model="password" type="password" placeholder="비밀번호" class="border p-2 w-full" />
+
+      <button type="submit" class="border p-2 w-full">로그인</button>
+
+      <p v-if="err" class="text-red-500 text-sm">
+        {{ err }}
+      </p>
+    </form>
   </div>
 </template>

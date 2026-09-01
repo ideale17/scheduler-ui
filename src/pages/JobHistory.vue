@@ -1,13 +1,12 @@
 <script setup>
 import { onMounted, ref } from 'vue'
-import axios from 'axios'
+import http from '@/api/http'
 
 const historyList = ref([])
 
 const fetchJobHistoryList = async () => {
   try {
-    const response = await axios.get('http://localhost:8080/jobs/historyJobs')
-    console.log('📦 응답:', response.data)
+    const response = await http.get('/jobs/historyJobs')
     historyList.value = Array.isArray(response.data) ? response.data : []
   } catch (error) {
     console.error('❌ 목록 불러오기 실패:', error)
