@@ -55,14 +55,21 @@ const addJob = async () => {
     return
   }
 
+  // 2. 등록 여부를 확인한다.
+  if (
+    !confirm(`${jobData.value.jobGroup} 그룹의 ${jobData.value.jobName} Job을 등록하시겠습니까?`)
+  ) {
+    return
+  }
+
   try {
-    // 2. 화면의 Key/Value 목록을 백엔드 요청 형식의 params 객체로 변환한다.
+    // 3. 화면의 Key/Value 목록을 백엔드 요청 형식의 params 객체로 변환한다.
     jobData.value.params = buildParams()
 
-    // 3. Job 등록 API를 호출한다.
+    // 4. Job 등록 API를 호출한다.
     const response = await createJob(jobData.value)
 
-    // 4. 등록 성공 후 목록 화면으로 이동한다.
+    // 5. 등록 성공 후 목록 화면으로 이동한다.
     alert('Job 등록 성공')
     console.log(response.data)
 

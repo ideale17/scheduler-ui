@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import AppLayout from '@/layouts/AppLayout.vue'
 import JobList from '@/pages/JobList.vue'
 import AddJobForm from '@/pages/AddJobForm.vue'
+import EditJob from '@/pages/EditJob.vue'
 import JobHistory from '@/pages/JobHistory.vue'
 import Login from '@/pages/Login.vue'
 import http from '@/api/http'
@@ -16,6 +17,11 @@ const routes = [
     children: [
       { path: '', component: JobList, meta: { title: '등록된 Job 목록', requiresAuth: true } },
       { path: 'add', component: AddJobForm, meta: { title: 'Job 등록', requiresAuth: true } },
+      {
+        path: 'edit/:jobName/:jobGroup',
+        component: EditJob,
+        meta: { title: 'Job 수정', requiresAuth: true },
+      },
       {
         path: 'JobHistory',
         component: JobHistory,

@@ -76,6 +76,10 @@ const resumeJob = async (jobName, jobGroup) => {
     alert('재시작 실패')
   }
 }
+
+const editJob = (jobName, jobGroup) => {
+  router.push(`/edit/${encodeURIComponent(jobName)}/${encodeURIComponent(jobGroup)}`)
+}
 </script>
 
 <template>
@@ -95,7 +99,7 @@ const resumeJob = async (jobName, jobGroup) => {
           <th class="border px-2 py-1">그룹</th>
           <th class="border px-2 py-1">상태</th>
           <th class="border px-2 py-1">Cron</th>
-          <th class="border px-2 py-1">삭제</th>
+          <th class="border px-2 py-1">관리</th>
         </tr>
       </thead>
       <tbody>
@@ -116,6 +120,12 @@ const resumeJob = async (jobName, jobGroup) => {
               class="bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600 text-sm mr-1"
             >
               중지
+            </button>
+            <button
+              @click="editJob(job.jobName, job.jobGroup)"
+              class="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 text-sm mr-1"
+            >
+              수정
             </button>
             <button
               @click="deleteJob(job.jobName, job.jobGroup)"
