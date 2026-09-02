@@ -5,20 +5,7 @@ import { createJob, getJobClasses } from '@/api/jobApi'
 
 const router = useRouter()
 const jobClasses = ref([])
-
-// const jobData = ref({
-//   jobClassName: 'com.kji.scheduler.job.WeatherCollectJob',
-//   jobName: 'test',
-//   jobGroup: 'test',
-//   scheduleType: 'SIMPLE',
-//   scheduleExpr: '60',
-//   params: {
-//     baseDate: '20250807',
-//     baseTime: '1000',
-//     nx: '55',
-//     ny: '127',
-//   },
-// })
+const paramList = ref([])
 
 const jobData = ref({
   jobClassName: '',
@@ -44,6 +31,24 @@ onMounted(() => {
   loadJobClasses()
 })
 
+const addParam = () => {
+  paramList.value.push({
+    key: '',
+    value: '',
+  })
+}
+
+const removeParam = (index) => {
+  paramList.value.splice(index, 1)
+}
+
+const buildParams = () => {
+  return paramList.value.reduce((params, param) => {
+    params[param.key.trim()] = param.value
+    return params
+  }, {})
+}
+
 const addJob = async () => {
   // 1. 입력값을 검증한다.
   if (!validateJob()) {
@@ -51,10 +56,13 @@ const addJob = async () => {
   }
 
   try {
-    // 2. Job 등록 API를 호출한다.
+    // 2. 화면의 Key/Value 목록을 백엔드 요청 형식의 params 객체로 변환한다.
+    jobData.value.params = buildParams()
+
+    // 3. Job 등록 API를 호출한다.
     const response = await createJob(jobData.value)
 
-    // 3. 등록 성공 후 목록 화면으로 이동한다.
+    // 4. 등록 성공 후 목록 화면으로 이동한다.
     alert('Job 등록 성공')
     console.log(response.data)
 
@@ -132,30 +140,104 @@ const validateJob = () => {
       <div>
         <label class="block font-semibold">Schedule Expression</label>
         <input v-model="jobData.scheduleExpr" class="input" type="text" />
+
+        <div
+          v-if="jobData.scheduleType === 'CRON'"
+          class="mt-2 rounded border border-gray-200 bg-gray-50 px-3 py-2"
+        >
+          <div class="mb-1 text-xs font-semibold text-gray-600">CRON 예제</div>
+
+          <div class="space-y-1 text-sm text-gray-600">
+            <div class="flex justify-between gap-4">
+              <code class="text-gray-800">0 0/10 * * * ?</code>
+              <span>10분마다 실행</span>
+            </div>
+
+            <div class="flex justify-between gap-4">
+              <code class="text-gray-800">0 0 * * * ?</code>
+              <span>매시 정각 실행</span>
+            </div>
+
+            <div class="flex justify-between gap-4">
+              <code class="text-gray-800">0 0 9 * * ?</code>
+              <span>매일 오전 9시 실행</span>
+            </div>
+
+            <div class="flex justify-between gap-4">
+              <code class="text-gray-800">0 0 9 ? * MON-FRI</code>
+              <span>평일 오전 9시 실행</span>
+            </div>
+          </div>
+        </div>
+
+        <div
+          v-else-if="jobData.scheduleType === 'SIMPLE'"
+          class="mt-2 rounded border border-gray-200 bg-gray-50 px-3 py-2"
+        >
+          <div class="mb-1 text-xs font-semibold text-gray-600">SIMPLE 예제</div>
+
+          <div class="space-y-1 text-sm text-gray-600">
+            <div class="flex justify-between gap-4">
+              <code class="text-gray-800">10</code>
+              <span>10초마다 실행</span>
+            </div>
+
+            <div class="flex justify-between gap-4">
+              <code class="text-gray-800">60</code>
+              <span>1분마다 실행</span>
+            </div>
+
+            <div class="flex justify-between gap-4">
+              <code class="text-gray-800">300</code>
+              <span>5분마다 실행</span>
+            </div>
+
+            <div class="flex justify-between gap-4">
+              <code class="text-gray-800">3600</code>
+              <span>1시간마다 실행</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <fieldset class="border border-gray-300 p-4 rounded">
         <legend class="font-bold">파라미터 (params)</legend>
 
-        <div>
-          <label class="block font-semibold">Base Date</label>
-          <input v-model="jobData.params.baseDate" class="input" type="text" />
+        <div
+          v-for="(param, index) in paramList"
+          :key="index"
+          class="grid grid-cols-[1fr_1fr_auto] gap-2 items-end mb-3"
+        >
+          <div>
+            <label class="block font-semibold">Key</label>
+            <input v-model="param.key" class="input" type="text" placeholder="예: baseDate" />
+          </div>
+
+          <div>
+            <label class="block font-semibold">Value</label>
+            <input v-model="param.value" class="input" type="text" placeholder="값" />
+          </div>
+
+          <button
+            type="button"
+            @click="removeParam(index)"
+            class="border border-red-300 text-red-600 px-3 py-2 rounded hover:bg-red-50"
+          >
+            삭제
+          </button>
         </div>
 
-        <div>
-          <label class="block font-semibold">Base Time</label>
-          <input v-model="jobData.params.baseTime" class="input" type="text" />
+        <div v-if="paramList.length === 0" class="text-sm text-gray-500 mb-3">
+          등록된 파라미터가 없습니다. 필요한 경우 파라미터를 추가해주세요.
         </div>
 
-        <div>
-          <label class="block font-semibold">nx</label>
-          <input v-model="jobData.params.nx" class="input" type="text" />
-        </div>
-
-        <div>
-          <label class="block font-semibold">ny</label>
-          <input v-model="jobData.params.ny" class="input" type="text" />
-        </div>
+        <button
+          type="button"
+          @click="addParam"
+          class="border border-gray-300 px-3 py-2 rounded hover:bg-gray-100"
+        >
+          + 파라미터 추가
+        </button>
       </fieldset>
 
       <div class="flex justify-center gap-2">
