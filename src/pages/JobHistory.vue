@@ -5,9 +5,63 @@ import http from '@/api/http'
 const historyList = ref([])
 const selectedHistoryId = ref(null)
 
+const searchCondition = ref({
+  jobName: '',
+  jobGroup: '',
+  status: '',
+  startDate: '',
+  endDate: '',
+})
+
+const searchJobHistory = async () => {
+  // 1. 시작일과 종료일이 모두 입력된 경우 기간을 검증한다.
+  if (
+    searchCondition.value.startDate &&
+    searchCondition.value.endDate &&
+    searchCondition.value.startDate > searchCondition.value.endDate
+  ) {
+    alert('시작일은 종료일보다 늦을 수 없습니다.')
+    return
+  }
+
+  // 2. 열려 있는 실행 이력 상세를 닫는다.
+  selectedHistoryId.value = null
+
+  // 3. 검색조건으로 실행 이력을 다시 조회한다.
+  await fetchJobHistoryList()
+}
+
+const resetSearchCondition = async () => {
+  // 1. 검색조건을 초기값으로 되돌린다.
+  searchCondition.value = {
+    jobName: '',
+    jobGroup: '',
+    status: '',
+    startDate: '',
+    endDate: '',
+  }
+
+  // 2. 열려 있는 실행 이력 상세를 닫는다.
+  selectedHistoryId.value = null
+
+  // 3. 전체 실행 이력을 다시 조회한다.
+  await fetchJobHistoryList()
+}
+
 const fetchJobHistoryList = async () => {
   try {
-    const response = await http.get('/jobs/historyJobs')
+    // 1. 화면에 입력된 검색조건으로 실행 이력 조회 API를 호출한다.
+    const response = await http.get('/jobs/historyJobs', {
+      params: {
+        jobName: searchCondition.value.jobName.trim(),
+        jobGroup: searchCondition.value.jobGroup.trim(),
+        status: searchCondition.value.status,
+        startDate: searchCondition.value.startDate,
+        endDate: searchCondition.value.endDate,
+      },
+    })
+
+    // 2. 조회 결과를 실행 이력 목록에 저장한다.
     historyList.value = Array.isArray(response.data) ? response.data : []
   } catch (error) {
     console.error('❌ 목록 불러오기 실패:', error)
@@ -51,6 +105,83 @@ const toggleHistoryDetail = (logId) => {
   <div class="p-4">
     <div class="flex justify-end items-center mb-4">
       <!-- <h2 class="text-2xl font-bold">📋 등록된 Job 목록</h2> -->
+    </div>
+
+    <div class="mb-4 rounded border border-gray-200 bg-white p-4">
+      <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-5">
+        <div>
+          <label class="mb-1 block text-sm font-medium text-gray-700"> Job명 </label>
+
+          <input
+            v-model="searchCondition.jobName"
+            type="text"
+            class="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+            placeholder="Job명"
+          />
+        </div>
+
+        <div>
+          <label class="mb-1 block text-sm font-medium text-gray-700"> Job 그룹 </label>
+
+          <input
+            v-model="searchCondition.jobGroup"
+            type="text"
+            class="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+            placeholder="Job 그룹"
+          />
+        </div>
+
+        <div>
+          <label class="mb-1 block text-sm font-medium text-gray-700"> 실행 상태 </label>
+
+          <select
+            v-model="searchCondition.status"
+            class="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+          >
+            <option value="">전체</option>
+            <option value="SUCCESS">성공</option>
+            <option value="FAILED">실패</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="mb-1 block text-sm font-medium text-gray-700"> 시작일 </label>
+
+          <input
+            v-model="searchCondition.startDate"
+            type="date"
+            class="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+          />
+        </div>
+
+        <div>
+          <label class="mb-1 block text-sm font-medium text-gray-700"> 종료일 </label>
+
+          <input
+            v-model="searchCondition.endDate"
+            type="date"
+            class="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+          />
+        </div>
+      </div>
+
+      <div class="mt-3 flex justify-end gap-2">
+        <button
+          type="button"
+          class="rounded bg-gray-500 px-4 py-2 text-sm text-white hover:bg-gray-600"
+          @click="resetSearchCondition"
+        >
+          초기화
+        </button>
+
+        <button
+          type="button"
+          class="rounded bg-blue-500 px-4 py-2 text-sm text-white hover:bg-blue-600"
+          @click="searchJobHistory"
+        >
+          조회
+        </button>
+      </div>
     </div>
 
     <div v-if="historyList.length > 0" class="overflow-x-auto">
