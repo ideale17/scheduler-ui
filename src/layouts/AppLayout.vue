@@ -58,7 +58,7 @@ const logout = async () => {
     </aside>
 
     <!-- 메인 영역 -->
-    <main class="flex-1 flex flex-col">
+    <main class="flex-1 min-w-0 flex flex-col">
       <!-- 상단바 -->
       <header class="flex items-center justify-between p-4 border-b bg-white">
         <h2 class="text-xl font-semibold">{{ pageTitle }}</h2>
@@ -73,7 +73,7 @@ const logout = async () => {
       </header>
 
       <!-- 본문 영역 -->
-      <section class="flex-1 p-4 bg-gray-50">
+      <section class="flex-1 min-w-0 p-4 bg-gray-50">
         <router-view />
       </section>
     </main>
