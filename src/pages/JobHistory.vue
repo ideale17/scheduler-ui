@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import http from '@/api/http'
 
+// 1. 화면 상태
 const historyList = ref([])
 const selectedHistoryId = ref(null)
 
@@ -17,6 +18,65 @@ const currentPage = ref(1)
 const pageSize = ref(10)
 const totalCount = ref(0)
 
+// 2. 계산값
+const totalPages = computed(() => {
+  if (totalCount.value === 0) {
+    return 1
+  }
+
+  return Math.ceil(totalCount.value / pageSize.value)
+})
+
+const visiblePages = computed(() => {
+  const maxVisiblePages = 5
+
+  let startPage = Math.max(currentPage.value - Math.floor(maxVisiblePages / 2), 1)
+
+  let endPage = startPage + maxVisiblePages - 1
+
+  if (endPage > totalPages.value) {
+    endPage = totalPages.value
+    startPage = Math.max(endPage - maxVisiblePages + 1, 1)
+  }
+
+  const pages = []
+
+  for (let page = startPage; page <= endPage; page++) {
+    pages.push(page)
+  }
+
+  return pages
+})
+
+// 3. 실행 이력 조회
+const fetchJobHistoryList = async () => {
+  try {
+    // 1. 화면에 입력된 검색조건과 페이징 정보로 실행 이력 조회 API를 호출한다.
+    const response = await http.get('/jobs/historyJobs', {
+      params: {
+        jobName: searchCondition.value.jobName.trim(),
+        jobGroup: searchCondition.value.jobGroup.trim(),
+        status: searchCondition.value.status,
+        startDate: searchCondition.value.startDate,
+        endDate: searchCondition.value.endDate,
+        page: currentPage.value,
+        size: pageSize.value,
+      },
+    })
+
+    // 2. 조회 결과를 실행 이력 목록에 저장한다.
+    historyList.value = Array.isArray(response.data.content) ? response.data.content : []
+
+    // 3. 전체 실행 이력 건수를 저장한다.
+    totalCount.value = Number(response.data.totalCount || 0)
+  } catch (error) {
+    console.error('❌ 목록 불러오기 실패:', error)
+    historyList.value = []
+    totalCount.value = 0
+  }
+}
+
+// 4. 검색
 const searchJobHistory = async () => {
   // 1. 시작일과 종료일이 모두 입력된 경우 기간을 검증한다.
   if (
@@ -28,12 +88,13 @@ const searchJobHistory = async () => {
     return
   }
 
+  // 2. 페이지를 첫 페이지로 초기화한다.
   currentPage.value = 1
 
-  // 2. 열려 있는 실행 이력 상세를 닫는다.
+  // 3. 열려 있는 실행 이력 상세를 닫는다.
   selectedHistoryId.value = null
 
-  // 3. 검색조건으로 실행 이력을 다시 조회한다.
+  // 4. 검색조건으로 실행 이력을 다시 조회한다.
   await fetchJobHistoryList()
 }
 
@@ -57,44 +118,7 @@ const resetSearchCondition = async () => {
   await fetchJobHistoryList()
 }
 
-const fetchJobHistoryList = async () => {
-  try {
-    // 1. 화면에 입력된 검색조건으로 실행 이력 조회 API를 호출한다.
-    const response = await http.get('/jobs/historyJobs', {
-      params: {
-        jobName: searchCondition.value.jobName.trim(),
-        jobGroup: searchCondition.value.jobGroup.trim(),
-        status: searchCondition.value.status,
-        startDate: searchCondition.value.startDate,
-        endDate: searchCondition.value.endDate,
-        page: currentPage.value,
-        size: pageSize.value,
-      },
-    })
-
-    // 2. 조회 결과를 실행 이력 목록에 저장한다.
-    historyList.value = Array.isArray(response.data.content) ? response.data.content : []
-
-    // 3. 전체 실행 이력 건수를 저장한다.
-    totalCount.value = Number(response.data.totalCount || 0)
-  } catch (error) {
-    console.error('❌ 목록 불러오기 실패:', error)
-    historyList.value = []
-  }
-}
-
-onMounted(() => {
-  fetchJobHistoryList()
-})
-
-const totalPages = computed(() => {
-  if (totalCount.value === 0) {
-    return 1
-  }
-
-  return Math.ceil(totalCount.value / pageSize.value)
-})
-
+// 5. 페이징
 const changePage = async (page) => {
   if (page < 1 || page > totalPages.value) {
     return
@@ -106,6 +130,12 @@ const changePage = async (page) => {
   await fetchJobHistoryList()
 }
 
+// 6. 상세
+const toggleHistoryDetail = (logId) => {
+  selectedHistoryId.value = selectedHistoryId.value === logId ? null : logId
+}
+
+// 7. 화면 표시용 변환
 const formatRunMillis = (runMillis) => {
   const millis = Number(runMillis)
 
@@ -129,9 +159,10 @@ const formatDateTime = (dateTime) => {
   return String(dateTime).replace('T', ' ').substring(0, 19)
 }
 
-const toggleHistoryDetail = (logId) => {
-  selectedHistoryId.value = selectedHistoryId.value === logId ? null : logId
-}
+// 8. 화면 최초 진입
+onMounted(() => {
+  fetchJobHistoryList()
+})
 </script>
 
 <template>
@@ -346,7 +377,20 @@ const toggleHistoryDetail = (logId) => {
         이전
       </button>
 
-      <span class="text-sm text-gray-600"> {{ currentPage }} / {{ totalPages }} </span>
+      <button
+        v-for="page in visiblePages"
+        :key="page"
+        type="button"
+        class="min-w-8 rounded border px-3 py-1 text-sm"
+        :class="
+          currentPage === page
+            ? 'border-blue-500 bg-blue-500 text-white'
+            : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+        "
+        @click="changePage(page)"
+      >
+        {{ page }}
+      </button>
 
       <button
         type="button"
