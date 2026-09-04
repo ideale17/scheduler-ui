@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import http from '@/api/http'
 
 const historyList = ref([])
@@ -13,6 +13,10 @@ const searchCondition = ref({
   endDate: '',
 })
 
+const currentPage = ref(1)
+const pageSize = ref(10)
+const totalCount = ref(0)
+
 const searchJobHistory = async () => {
   // 1. 시작일과 종료일이 모두 입력된 경우 기간을 검증한다.
   if (
@@ -23,6 +27,8 @@ const searchJobHistory = async () => {
     alert('시작일은 종료일보다 늦을 수 없습니다.')
     return
   }
+
+  currentPage.value = 1
 
   // 2. 열려 있는 실행 이력 상세를 닫는다.
   selectedHistoryId.value = null
@@ -41,10 +47,13 @@ const resetSearchCondition = async () => {
     endDate: '',
   }
 
-  // 2. 열려 있는 실행 이력 상세를 닫는다.
+  // 2. 페이지를 첫 페이지로 초기화한다.
+  currentPage.value = 1
+
+  // 3. 열려 있는 실행 이력 상세를 닫는다.
   selectedHistoryId.value = null
 
-  // 3. 전체 실행 이력을 다시 조회한다.
+  // 4. 전체 실행 이력을 다시 조회한다.
   await fetchJobHistoryList()
 }
 
@@ -58,11 +67,16 @@ const fetchJobHistoryList = async () => {
         status: searchCondition.value.status,
         startDate: searchCondition.value.startDate,
         endDate: searchCondition.value.endDate,
+        page: currentPage.value,
+        size: pageSize.value,
       },
     })
 
     // 2. 조회 결과를 실행 이력 목록에 저장한다.
-    historyList.value = Array.isArray(response.data) ? response.data : []
+    historyList.value = Array.isArray(response.data.content) ? response.data.content : []
+
+    // 3. 전체 실행 이력 건수를 저장한다.
+    totalCount.value = Number(response.data.totalCount || 0)
   } catch (error) {
     console.error('❌ 목록 불러오기 실패:', error)
     historyList.value = []
@@ -72,6 +86,25 @@ const fetchJobHistoryList = async () => {
 onMounted(() => {
   fetchJobHistoryList()
 })
+
+const totalPages = computed(() => {
+  if (totalCount.value === 0) {
+    return 1
+  }
+
+  return Math.ceil(totalCount.value / pageSize.value)
+})
+
+const changePage = async (page) => {
+  if (page < 1 || page > totalPages.value) {
+    return
+  }
+
+  currentPage.value = page
+  selectedHistoryId.value = null
+
+  await fetchJobHistoryList()
+}
 
 const formatRunMillis = (runMillis) => {
   const millis = Number(runMillis)
@@ -102,7 +135,7 @@ const toggleHistoryDetail = (logId) => {
 </script>
 
 <template>
-  <div class="p-4">
+  <div class="flex min-h-full flex-col p-4">
     <div class="flex justify-end items-center mb-4">
       <!-- <h2 class="text-2xl font-bold">📋 등록된 Job 목록</h2> -->
     </div>
@@ -184,7 +217,7 @@ const toggleHistoryDetail = (logId) => {
       </div>
     </div>
 
-    <div v-if="historyList.length > 0" class="overflow-x-auto">
+    <div v-if="historyList.length > 0" class="min-h-[420px] overflow-x-auto">
       <table class="w-full border border-gray-300 text-sm">
         <thead class="bg-gray-100">
           <tr>
@@ -302,5 +335,27 @@ const toggleHistoryDetail = (logId) => {
     </div>
 
     <div v-else class="text-gray-500">📭 실행 이력이 없습니다.</div>
+
+    <div v-if="totalCount > 0" class="mt-4 flex items-center justify-center gap-3">
+      <button
+        type="button"
+        :disabled="currentPage === 1"
+        class="rounded border border-gray-300 px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-40"
+        @click="changePage(currentPage - 1)"
+      >
+        이전
+      </button>
+
+      <span class="text-sm text-gray-600"> {{ currentPage }} / {{ totalPages }} </span>
+
+      <button
+        type="button"
+        :disabled="currentPage === totalPages"
+        class="rounded border border-gray-300 px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-40"
+        @click="changePage(currentPage + 1)"
+      >
+        다음
+      </button>
+    </div>
   </div>
 </template>
