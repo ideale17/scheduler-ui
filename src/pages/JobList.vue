@@ -99,6 +99,16 @@ const editJob = (jobName, jobGroup) => {
   router.push(`/edit/${encodeURIComponent(jobName)}/${encodeURIComponent(jobGroup)}`)
 }
 
+const viewJobHistory = (jobName, jobGroup) => {
+  router.push({
+    path: '/JobHistory',
+    query: {
+      jobName: jobName,
+      jobGroup: jobGroup,
+    },
+  })
+}
+
 const getJobStatusLabel = (triggerState) => {
   const statusLabels = {
     NORMAL: '정상',
@@ -248,6 +258,12 @@ const formatFireTime = (fireTime) => {
               class="bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600 text-sm mr-1"
             >
               중지
+            </button>
+            <button
+              @click="viewJobHistory(job.jobName, job.jobGroup)"
+              class="bg-gray-600 text-white px-2 py-1 rounded hover:bg-gray-700 text-sm mr-1"
+            >
+              이력
             </button>
             <button
               @click="editJob(job.jobName, job.jobGroup)"

@@ -1,8 +1,10 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import http from '@/api/http'
 
 // 1. 화면 상태
+const route = useRoute()
 const historyList = ref([])
 const selectedHistoryId = ref(null)
 
@@ -161,6 +163,12 @@ const formatDateTime = (dateTime) => {
 
 // 8. 화면 최초 진입
 onMounted(() => {
+  // 1. Job 목록에서 전달한 Job명과 그룹이 있으면 검색조건에 반영한다.
+  searchCondition.value.jobName = typeof route.query.jobName === 'string' ? route.query.jobName : ''
+  searchCondition.value.jobGroup =
+    typeof route.query.jobGroup === 'string' ? route.query.jobGroup : ''
+
+  // 2. 설정된 검색조건으로 실행 이력을 조회한다.
   fetchJobHistoryList()
 })
 </script>
