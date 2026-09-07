@@ -41,6 +41,24 @@ const deleteJob = async (jobName, jobGroup) => {
   }
 }
 
+const runJob = async (jobName, jobGroup) => {
+  if (!confirm(`▶️ ${jobGroup} 그룹의 ${jobName} Job을 즉시 실행하시겠습니까?`)) return
+
+  try {
+    await http.post('/jobs/runJob', null, {
+      params: {
+        jobName: jobName,
+        jobGroup: jobGroup,
+      },
+    })
+    alert('▶️ Job 즉시 실행 요청 성공')
+    await fetchJobList()
+  } catch (error) {
+    console.error('❌ 즉시 실행 실패:', error)
+    alert('즉시 실행 실패')
+  }
+}
+
 const pauseJob = async (jobName, jobGroup) => {
   if (!confirm(`⏸️ ${jobGroup} 그룹의 ${jobName} Job을 중지하시겠습니까?`)) return
 
@@ -213,6 +231,12 @@ const formatFireTime = (fireTime) => {
             {{ formatFireTime(job.nextFireTime) }}
           </td>
           <td class="border px-2 py-1 text-center">
+            <button
+              @click="runJob(job.jobName, job.jobGroup)"
+              class="bg-purple-500 text-white px-2 py-1 rounded hover:bg-purple-600 text-sm mr-1"
+            >
+              즉시 실행
+            </button>
             <button
               @click="resumeJob(job.jobName, job.jobGroup)"
               class="bg-green-500 text-white px-2 py-1 rounded hover:bg-yellow-600 text-sm mr-1"
