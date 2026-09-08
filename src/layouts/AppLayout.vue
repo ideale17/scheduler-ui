@@ -7,10 +7,10 @@ const route = useRoute()
 const router = useRouter()
 
 const menus = [
-  { to: '/', label: 'Jobs' },
-  { to: '/add', label: 'add Job' },
-  { to: '/JobHistory', label: 'Runs / History' },
-  { to: '/settings', label: 'Settings' },
+  { to: '/', label: 'Job 목록' },
+  { to: '/add', label: 'Job 등록' },
+  { to: '/JobHistory', label: 'Job 이력 목록' },
+  { to: '/schedulerInfo', label: 'Scheduler 정보' },
 ]
 const isActive = (path) => route.path === path
 

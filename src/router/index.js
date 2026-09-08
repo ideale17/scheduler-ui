@@ -5,9 +5,8 @@ import AddJobForm from '@/pages/AddJobForm.vue'
 import EditJob from '@/pages/EditJob.vue'
 import JobHistory from '@/pages/JobHistory.vue'
 import LoginView from '@/pages/LoginView.vue'
+import SchedulerInfoView from '@/pages/SchedulerInfoView.vue'
 import { getCurrentUser } from '@/api/authApi'
-
-const SettingsView = () => import('@/pages/SettingsView.vue')
 
 const routes = [
   { path: '/login', component: LoginView, meta: { requiresAuth: false, public: true } },
@@ -15,7 +14,7 @@ const routes = [
     path: '/',
     component: AppLayout,
     children: [
-      { path: '', component: JobList, meta: { title: '등록된 Job 목록', requiresAuth: true } },
+      { path: '', component: JobList, meta: { title: 'Job 목록', requiresAuth: true } },
       { path: 'add', component: AddJobForm, meta: { title: 'Job 등록', requiresAuth: true } },
       {
         path: 'edit/:jobName/:jobGroup',
@@ -28,9 +27,9 @@ const routes = [
         meta: { title: 'Job 이력 목록', requiresAuth: true },
       },
       {
-        path: 'settings',
-        component: SettingsView,
-        meta: { title: 'Settings', requiresAuth: true },
+        path: 'schedulerInfo',
+        component: SchedulerInfoView,
+        meta: { title: 'Scheduler 정보', requiresAuth: true },
       },
     ],
   },
