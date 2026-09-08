@@ -4,13 +4,13 @@ import JobList from '@/pages/JobList.vue'
 import AddJobForm from '@/pages/AddJobForm.vue'
 import EditJob from '@/pages/EditJob.vue'
 import JobHistory from '@/pages/JobHistory.vue'
-import Login from '@/pages/Login.vue'
+import LoginView from '@/pages/LoginView.vue'
 import { getCurrentUser } from '@/api/authApi'
 
 const SettingsView = () => import('@/pages/SettingsView.vue')
 
 const routes = [
-  { path: '/login', component: Login, meta: { requiresAuth: false, public: true } },
+  { path: '/login', component: LoginView, meta: { requiresAuth: false, public: true } },
   {
     path: '/',
     component: AppLayout,
