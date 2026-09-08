@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-import http from '@/api/http'
+import { loginUser } from '@/api/authApi'
 import { useRouter, useRoute } from 'vue-router'
 
 const router = useRouter()
@@ -13,10 +13,8 @@ const login = async () => {
   err.value = ''
   try {
     // 세션 발급
-    await http.post('/auth/login', {
-      username: username.value,
-      password: password.value,
-    })
+    await loginUser(username.value, password.value)
+
     // 돌아갈 곳 있으면 그리, 없으면 홈
     const redirect = route.query.redirect?.toString() || '/'
     router.replace(redirect)

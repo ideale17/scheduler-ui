@@ -1,7 +1,7 @@
 <script setup>
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { computed, ref, onMounted } from 'vue'
-import http from '@/api/http'
+import { getCurrentUser, logoutUser } from '@/api/authApi'
 
 const route = useRoute()
 const router = useRouter()
@@ -14,14 +14,15 @@ const menus = [
 ]
 const isActive = (path) => route.path === path
 
-// 🔹 meta.title 값을 가져오는 computed
+// meta.title 값을 가져오는 computed
 const pageTitle = computed(() => route.meta.title || '')
 
 // (선택) 사용자 표시용
 const username = ref(null)
 onMounted(async () => {
   try {
-    const { data } = await http.get('http://localhost:8080/auth/me')
+    const { data } = await getCurrentUser()
+
     username.value = data?.username ?? null
   } catch {
     username.value = null
@@ -30,7 +31,7 @@ onMounted(async () => {
 
 const logout = async () => {
   try {
-    await http.post('http://localhost:8080/auth/logout')
+    await logoutUser()
   } finally {
     router.push('/login') // 세션 파기 후 로그인 화면으로
   }

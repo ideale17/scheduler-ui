@@ -1,18 +1,23 @@
 <script setup>
 import { onMounted, ref } from 'vue'
-import http from '@/api/http'
 import { useRouter } from 'vue-router'
+import {
+  deleteJob as deleteJobApi,
+  getJobList,
+  pauseJob as pauseJobApi,
+  resumeJob as resumeJobApi,
+  runJob as runJobApi,
+} from '@/api/jobApi'
 
 const router = useRouter()
 const jobList = ref([])
 
 const fetchJobList = async () => {
   try {
-    const response = await http.get('/jobs/listJobs')
-    console.log('📦 응답:', response.data)
+    const response = await getJobList()
     jobList.value = Array.isArray(response.data) ? response.data : []
   } catch (error) {
-    console.error('❌ 목록 불러오기 실패:', error)
+    console.error('목록 불러오기 실패:', error)
     jobList.value = []
   }
 }
@@ -25,33 +30,25 @@ const deleteJob = async (jobName, jobGroup) => {
   if (!confirm(`정말 ${jobGroup} 그룹의 ${jobName} Job을 삭제하시겠습니까?`)) return
 
   try {
-    await http.delete('/jobs/deleteJob', {
-      params: {
-        jobName,
-        jobGroup,
-      },
-    })
-    alert('🗑️ 삭제 성공')
+    await deleteJobApi(jobName, jobGroup)
 
-    // ✅ 삭제 성공 후 최신 목록 다시 가져오기
+    alert('삭제 성공')
+
+    // 삭제 성공 후 최신 목록 다시 가져오기
     await fetchJobList()
   } catch (error) {
-    console.error('❌ 삭제 실패:', error)
+    console.error('삭제 실패:', error)
     alert('삭제 실패')
   }
 }
 
 const runJob = async (jobName, jobGroup) => {
-  if (!confirm(`▶️ ${jobGroup} 그룹의 ${jobName} Job을 즉시 실행하시겠습니까?`)) return
+  if (!confirm(`${jobGroup} 그룹의 ${jobName} Job을 즉시 실행하시겠습니까?`)) return
 
   try {
-    await http.post('/jobs/runJob', null, {
-      params: {
-        jobName: jobName,
-        jobGroup: jobGroup,
-      },
-    })
-    alert('▶️ Job 즉시 실행 요청 성공')
+    await runJobApi(jobName, jobGroup)
+
+    alert('Job 즉시 실행 요청 성공')
     await fetchJobList()
   } catch (error) {
     console.error('❌ 즉시 실행 실패:', error)
@@ -63,12 +60,8 @@ const pauseJob = async (jobName, jobGroup) => {
   if (!confirm(`⏸️ ${jobGroup} 그룹의 ${jobName} Job을 중지하시겠습니까?`)) return
 
   try {
-    await http.post('/jobs/pauseJob', null, {
-      params: {
-        jobName: jobName,
-        jobGroup: jobGroup,
-      },
-    })
+    await pauseJobApi(jobName, jobGroup)
+
     alert('⏸️ Job 중지 성공')
     await fetchJobList()
   } catch (error) {
@@ -81,12 +74,8 @@ const resumeJob = async (jobName, jobGroup) => {
   if (!confirm(`⏸️ ${jobGroup} 그룹의 ${jobName} Job을 재시작하시겠습니까?`)) return
 
   try {
-    await http.post('/jobs/resumeJob', null, {
-      params: {
-        jobName: jobName,
-        jobGroup: jobGroup,
-      },
-    })
+    await resumeJobApi(jobName, jobGroup)
+
     alert('⏸️ Job 재시작 성공')
     await fetchJobList()
   } catch (error) {

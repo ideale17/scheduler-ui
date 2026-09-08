@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import http from '@/api/http'
+import { getJobHistory } from '@/api/jobHistoryApi'
 
 // 1. 화면 상태
 const route = useRoute()
@@ -54,16 +54,14 @@ const visiblePages = computed(() => {
 const fetchJobHistoryList = async () => {
   try {
     // 1. 화면에 입력된 검색조건과 페이징 정보로 실행 이력 조회 API를 호출한다.
-    const response = await http.get('/jobs/historyJobs', {
-      params: {
-        jobName: searchCondition.value.jobName.trim(),
-        jobGroup: searchCondition.value.jobGroup.trim(),
-        status: searchCondition.value.status,
-        startDate: searchCondition.value.startDate,
-        endDate: searchCondition.value.endDate,
-        page: currentPage.value,
-        size: pageSize.value,
-      },
+    const response = await getJobHistory({
+      jobName: searchCondition.value.jobName.trim(),
+      jobGroup: searchCondition.value.jobGroup.trim(),
+      status: searchCondition.value.status,
+      startDate: searchCondition.value.startDate,
+      endDate: searchCondition.value.endDate,
+      page: currentPage.value,
+      size: pageSize.value,
     })
 
     // 2. 조회 결과를 실행 이력 목록에 저장한다.
@@ -72,7 +70,7 @@ const fetchJobHistoryList = async () => {
     // 3. 전체 실행 이력 건수를 저장한다.
     totalCount.value = Number(response.data.totalCount || 0)
   } catch (error) {
-    console.error('❌ 목록 불러오기 실패:', error)
+    console.error('목록 불러오기 실패:', error)
     historyList.value = []
     totalCount.value = 0
   }

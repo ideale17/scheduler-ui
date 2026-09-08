@@ -5,7 +5,7 @@ import AddJobForm from '@/pages/AddJobForm.vue'
 import EditJob from '@/pages/EditJob.vue'
 import JobHistory from '@/pages/JobHistory.vue'
 import Login from '@/pages/Login.vue'
-import http from '@/api/http'
+import { getCurrentUser } from '@/api/authApi'
 
 const SettingsView = () => import('@/pages/SettingsView.vue')
 
@@ -27,7 +27,11 @@ const routes = [
         component: JobHistory,
         meta: { title: 'Job 이력 목록', requiresAuth: true },
       },
-      { path: 'settings', component: SettingsView },
+      {
+        path: 'settings',
+        component: SettingsView,
+        meta: { title: 'Settings', requiresAuth: true },
+      },
     ],
   },
   // 없는 경로는 로그인으로
@@ -39,7 +43,7 @@ const router = createRouter({
   routes: routes,
 })
 
-// ✅ 중첩 라우트 대응 가드
+// 중첩 라우트 대응 가드
 router.beforeEach(async (to, from, next) => {
   const needsAuth = to.matched.some((r) => r.meta?.requiresAuth)
 
@@ -47,7 +51,7 @@ router.beforeEach(async (to, from, next) => {
     // 로그인 페이지에 이미 로그인 상태로 들어오면 홈으로
     if (to.path === '/login') {
       try {
-        const { data } = await http.get('/auth/me')
+        const { data } = await getCurrentUser()
 
         if (data?.username) {
           return next('/')
@@ -60,7 +64,7 @@ router.beforeEach(async (to, from, next) => {
   }
 
   try {
-    const { data } = await http.get('/auth/me')
+    const { data } = await getCurrentUser()
     if (data?.username) {
       return next()
     }
