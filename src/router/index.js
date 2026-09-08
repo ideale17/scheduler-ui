@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import AppLayout from '@/layouts/AppLayout.vue'
+import DashboardView from '@/pages/DashboardView.vue'
 import JobList from '@/pages/JobList.vue'
 import AddJobForm from '@/pages/AddJobForm.vue'
 import EditJob from '@/pages/EditJob.vue'
@@ -14,6 +15,11 @@ const routes = [
     path: '/',
     component: AppLayout,
     children: [
+      {
+        path: 'dashboard',
+        component: DashboardView,
+        meta: { title: 'Dashboard', requiresAuth: true },
+      },
       { path: '', component: JobList, meta: { title: 'Job 목록', requiresAuth: true } },
       { path: 'add', component: AddJobForm, meta: { title: 'Job 등록', requiresAuth: true } },
       {
