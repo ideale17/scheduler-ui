@@ -8,6 +8,7 @@ const router = useRouter()
 
 const isLoading = ref(false)
 const isSubmitting = ref(false)
+const paramList = ref([])
 
 const jobData = ref({
   jobClassName: '',
@@ -36,6 +37,11 @@ const loadJob = async () => {
           ? String(Math.floor((job.repeatInterval || 0) / 1000))
           : job.cronExpression || '',
     }
+
+    paramList.value = Object.entries(job.params || {}).map(([key, value]) => ({
+      key,
+      value: String(value ?? ''),
+    }))
   } catch (error) {
     console.error('Job 정보 조회 실패:', error)
     alert('Job 정보를 불러오지 못했습니다.')
@@ -88,6 +94,7 @@ const handleUpdateJob = async () => {
       jobGroup: jobData.value.jobGroup,
       scheduleType: jobData.value.scheduleType,
       scheduleExpr: jobData.value.scheduleExpr.trim(),
+      params: buildParams(),
     })
 
     // 4. 수정 성공 후 목록 화면으로 이동한다.
@@ -99,6 +106,24 @@ const handleUpdateJob = async () => {
     console.error('Job 수정 실패:', error)
     alert('Job 수정에 실패했습니다.')
   }
+}
+
+const addParam = () => {
+  paramList.value.push({
+    key: '',
+    value: '',
+  })
+}
+
+const removeParam = (index) => {
+  paramList.value.splice(index, 1)
+}
+
+const buildParams = () => {
+  return paramList.value.reduce((params, param) => {
+    params[param.key.trim()] = param.value
+    return params
+  }, {})
 }
 
 onMounted(() => {
@@ -196,6 +221,46 @@ onMounted(() => {
           </div>
         </div>
       </div>
+
+      <fieldset class="border border-gray-300 p-4 rounded">
+        <legend class="font-bold">파라미터 (params)</legend>
+
+        <div
+          v-for="(param, index) in paramList"
+          :key="index"
+          class="grid grid-cols-[1fr_1fr_auto] gap-2 items-end mb-3"
+        >
+          <div>
+            <label class="block font-semibold">Key</label>
+            <input v-model="param.key" class="input" type="text" placeholder="예: baseDate" />
+          </div>
+
+          <div>
+            <label class="block font-semibold">Value</label>
+            <input v-model="param.value" class="input" type="text" placeholder="값" />
+          </div>
+
+          <button
+            type="button"
+            @click="removeParam(index)"
+            class="border border-red-300 text-red-600 px-3 py-2 rounded hover:bg-red-50"
+          >
+            삭제
+          </button>
+        </div>
+
+        <div v-if="paramList.length === 0" class="text-sm text-gray-500 mb-3">
+          등록된 파라미터가 없습니다. 필요한 경우 파라미터를 추가해주세요.
+        </div>
+
+        <button
+          type="button"
+          @click="addParam"
+          class="border border-gray-300 px-3 py-2 rounded hover:bg-gray-100"
+        >
+          + 파라미터 추가
+        </button>
+      </fieldset>
 
       <div class="flex justify-center gap-2">
         <button
