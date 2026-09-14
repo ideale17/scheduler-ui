@@ -10,6 +10,7 @@ import SchedulerInfoView from '@/pages/SchedulerInfoView.vue'
 import { getCurrentUser } from '@/api/authApi'
 import ExternalApiList from '@/pages/ExternalApiList.vue'
 import ExternalApiAdd from '@/pages/ExternalApiAdd.vue'
+import ExternalApiDetail from '@/pages/ExternalApiDetail.vue'
 
 const routes = [
   { path: '/login', component: LoginView, meta: { requiresAuth: false, public: true } },
@@ -47,6 +48,14 @@ const routes = [
         component: ExternalApiAdd,
         meta: {
           title: 'External API 등록',
+          requiresAuth: true,
+        },
+      },
+      {
+        path: 'externalApi/:externalApiId',
+        component: ExternalApiDetail,
+        meta: {
+          title: 'External API 상세',
           requiresAuth: true,
         },
       },

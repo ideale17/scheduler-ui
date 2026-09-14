@@ -52,6 +52,10 @@ const getMethodClass = (httpMethod) => {
   return methodClasses[httpMethod] || 'bg-gray-100 text-gray-700'
 }
 
+const viewDetail = (externalApiId) => {
+  router.push(`/externalApi/${externalApiId}`)
+}
+
 onMounted(() => {
   fetchExternalApiList()
 })
@@ -113,6 +117,13 @@ onMounted(() => {
           </td>
 
           <td class="border px-2 py-1 text-center whitespace-nowrap">
+            <button
+              @click="viewDetail(externalApi.externalApiId)"
+              class="bg-gray-600 text-white px-2 py-1 rounded hover:bg-gray-700 text-sm mr-1"
+            >
+              상세
+            </button>
+
             <button
               @click="executeApi(externalApi)"
               class="bg-purple-500 text-white px-2 py-1 rounded hover:bg-purple-600 text-sm"
