@@ -45,7 +45,7 @@ const loadJob = async () => {
   } catch (error) {
     console.error('Job 정보 조회 실패:', error)
     alert('Job 정보를 불러오지 못했습니다.')
-    router.push('/')
+    router.push('/jobList')
   } finally {
     isLoading.value = false
   }
@@ -101,7 +101,7 @@ const handleUpdateJob = async () => {
     alert('Job 수정 성공')
     console.log(response.data)
 
-    router.push('/')
+    router.push('/jobList')
   } catch (error) {
     console.error('Job 수정 실패:', error)
     alert('Job 수정에 실패했습니다.')

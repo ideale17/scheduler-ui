@@ -16,11 +16,11 @@ const routes = [
     component: AppLayout,
     children: [
       {
-        path: 'dashboard',
+        path: '',
         component: DashboardView,
         meta: { title: 'Dashboard', requiresAuth: true },
       },
-      { path: '', component: JobList, meta: { title: 'Job 목록', requiresAuth: true } },
+      { path: 'jobList', component: JobList, meta: { title: 'Job 목록', requiresAuth: true } },
       { path: 'add', component: AddJobForm, meta: { title: 'Job 등록', requiresAuth: true } },
       {
         path: 'edit/:jobName/:jobGroup',

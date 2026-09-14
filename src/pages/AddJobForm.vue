@@ -73,7 +73,7 @@ const addJob = async () => {
     alert('Job 등록 성공')
     console.log(response.data)
 
-    router.push('/')
+    router.push('/jobList')
   } catch (error) {
     console.error('Job 등록 실패:', error)
     alert('Job 등록에 실패했습니다.')

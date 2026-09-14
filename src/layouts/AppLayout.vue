@@ -7,8 +7,8 @@ const route = useRoute()
 const router = useRouter()
 
 const menus = [
-  { to: '/dashboard', label: 'Dashboard' },
-  { to: '/', label: 'Job 목록' },
+  { to: '/', label: 'Dashboard' },
+  { to: '/jobList', label: 'Job 목록' },
   { to: '/add', label: 'Job 등록' },
   { to: '/JobHistory', label: 'Job 이력 목록' },
   { to: '/schedulerInfo', label: 'Scheduler 정보' },
