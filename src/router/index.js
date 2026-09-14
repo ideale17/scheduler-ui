@@ -8,6 +8,7 @@ import JobHistory from '@/pages/JobHistory.vue'
 import LoginView from '@/pages/LoginView.vue'
 import SchedulerInfoView from '@/pages/SchedulerInfoView.vue'
 import { getCurrentUser } from '@/api/authApi'
+import ExternalApiList from '@/pages/ExternalApiList.vue'
 
 const routes = [
   { path: '/login', component: LoginView, meta: { requiresAuth: false, public: true } },
@@ -31,6 +32,14 @@ const routes = [
         path: 'JobHistory',
         component: JobHistory,
         meta: { title: 'Job 이력 목록', requiresAuth: true },
+      },
+      {
+        path: 'externalApi',
+        component: ExternalApiList,
+        meta: {
+          title: 'External API',
+          requiresAuth: true,
+        },
       },
       {
         path: 'schedulerInfo',

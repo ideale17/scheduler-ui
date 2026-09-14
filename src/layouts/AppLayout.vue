@@ -11,6 +11,7 @@ const menus = [
   { to: '/jobList', label: 'Job 목록' },
   { to: '/add', label: 'Job 등록' },
   { to: '/JobHistory', label: 'Job 이력 목록' },
+  { to: '/externalApi', label: 'External API' },
   { to: '/schedulerInfo', label: 'Scheduler 정보' },
 ]
 const isActive = (path) => route.path === path
