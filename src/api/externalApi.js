@@ -11,3 +11,7 @@ export const executeExternalApi = (externalApiId) => {
     },
   })
 }
+
+export const createExternalApi = (requestData) => {
+  return http.post('/externalApi/add', requestData)
+}

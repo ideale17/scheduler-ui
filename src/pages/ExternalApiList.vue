@@ -1,7 +1,9 @@
 <script setup>
 import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { executeExternalApi, getExternalApiList } from '@/api/externalApi'
 
+const router = useRouter()
 const externalApiList = ref([])
 
 const fetchExternalApiList = async () => {
@@ -58,7 +60,12 @@ onMounted(() => {
 <template>
   <div class="p-4">
     <div class="flex justify-end items-center mb-4">
-      <button class="bg-blue-500 text-white px-3 py-1 rounded">➕ API 등록</button>
+      <button
+        @click="router.push('/externalApi/add')"
+        class="bg-blue-500 text-white px-3 py-1 rounded"
+      >
+        ➕ API 등록
+      </button>
     </div>
 
     <table v-if="externalApiList.length > 0" class="w-full border border-gray-300">
