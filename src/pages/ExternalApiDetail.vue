@@ -98,6 +98,14 @@ onMounted(() => {
 
             <button
               type="button"
+              @click="router.push(`/externalApi/${externalApi.externalApiId}/edit`)"
+              class="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+            >
+              수정
+            </button>
+
+            <button
+              type="button"
               @click="router.push('/externalApi')"
               class="bg-gray-300 px-3 py-1 rounded"
             >

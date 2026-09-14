@@ -31,3 +31,11 @@ export const getExternalApiParams = (externalApiId) => {
     },
   })
 }
+
+export const updateExternalApi = (externalApiId, requestData) => {
+  return http.put('/externalApi/update', requestData, {
+    params: {
+      externalApiId,
+    },
+  })
+}

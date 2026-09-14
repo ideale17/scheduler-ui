@@ -11,6 +11,7 @@ import { getCurrentUser } from '@/api/authApi'
 import ExternalApiList from '@/pages/ExternalApiList.vue'
 import ExternalApiAdd from '@/pages/ExternalApiAdd.vue'
 import ExternalApiDetail from '@/pages/ExternalApiDetail.vue'
+import ExternalApiEdit from '@/pages/ExternalApiEdit.vue'
 
 const routes = [
   { path: '/login', component: LoginView, meta: { requiresAuth: false, public: true } },
@@ -56,6 +57,14 @@ const routes = [
         component: ExternalApiDetail,
         meta: {
           title: 'External API 상세',
+          requiresAuth: true,
+        },
+      },
+      {
+        path: 'externalApi/:externalApiId/edit',
+        component: ExternalApiEdit,
+        meta: {
+          title: 'External API 수정',
           requiresAuth: true,
         },
       },
