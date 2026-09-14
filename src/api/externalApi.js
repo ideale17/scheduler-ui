@@ -39,3 +39,11 @@ export const updateExternalApi = (externalApiId, requestData) => {
     },
   })
 }
+
+export const deleteExternalApi = (externalApiId) => {
+  return http.delete('/externalApi/delete', {
+    params: {
+      externalApiId,
+    },
+  })
+}

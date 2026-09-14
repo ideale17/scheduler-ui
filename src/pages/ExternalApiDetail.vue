@@ -1,7 +1,12 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { executeExternalApi, getExternalApi, getExternalApiParams } from '@/api/externalApi'
+import {
+  deleteExternalApi,
+  executeExternalApi,
+  getExternalApi,
+  getExternalApiParams,
+} from '@/api/externalApi'
 
 const route = useRoute()
 const router = useRouter()
@@ -73,6 +78,28 @@ const getMethodClass = (httpMethod) => {
   return methodClasses[httpMethod] || 'bg-gray-100 text-gray-700'
 }
 
+const deleteApi = async () => {
+  if (!externalApi.value) {
+    return
+  }
+
+  if (!confirm(`${externalApi.value.apiName} API를 삭제하시겠습니까?`)) {
+    return
+  }
+
+  try {
+    await deleteExternalApi(externalApi.value.externalApiId)
+
+    alert('External API 삭제 성공')
+    router.push('/externalApi')
+  } catch (error) {
+    console.error('External API 삭제 실패:', error)
+
+    const message = error.response?.data || 'External API 삭제에 실패했습니다.'
+    alert(message)
+  }
+}
+
 onMounted(() => {
   fetchExternalApiDetail()
 })
@@ -102,6 +129,14 @@ onMounted(() => {
               class="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
             >
               수정
+            </button>
+
+            <button
+              type="button"
+              @click="deleteApi"
+              class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
+            >
+              삭제
             </button>
 
             <button

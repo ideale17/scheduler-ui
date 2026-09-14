@@ -253,7 +253,7 @@ const validateJob = () => {
         </button>
         <button
           type="button"
-          @click="router.push('/')"
+          @click="router.push('/jobList')"
           class="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
         >
           취소
