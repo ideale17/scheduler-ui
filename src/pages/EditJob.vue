@@ -16,6 +16,7 @@ const jobData = ref({
   jobGroup: '',
   scheduleType: '',
   scheduleExpr: '',
+  misfirePolicy: 'SMART_POLICY',
 })
 
 const loadJob = async () => {
@@ -36,6 +37,7 @@ const loadJob = async () => {
         scheduleType === 'SIMPLE'
           ? String(Math.floor((job.repeatInterval || 0) / 1000))
           : job.cronExpression || '',
+      misfirePolicy: job.misfirePolicy || 'SMART_POLICY',
     }
 
     paramList.value = Object.entries(job.params || {}).map(([key, value]) => ({
@@ -94,6 +96,7 @@ const handleUpdateJob = async () => {
       jobGroup: jobData.value.jobGroup,
       scheduleType: jobData.value.scheduleType,
       scheduleExpr: jobData.value.scheduleExpr.trim(),
+      misfirePolicy: jobData.value.misfirePolicy,
       params: buildParams(),
     })
 
@@ -126,6 +129,10 @@ const buildParams = () => {
   }, {})
 }
 
+const changeScheduleType = () => {
+  jobData.value.misfirePolicy = 'SMART_POLICY'
+}
+
 onMounted(() => {
   loadJob()
 })
@@ -153,7 +160,7 @@ onMounted(() => {
 
       <div>
         <label class="block font-semibold">Schedule Type</label>
-        <select v-model="jobData.scheduleType" class="input">
+        <select v-model="jobData.scheduleType" class="input" @change="changeScheduleType">
           <option value="SIMPLE">SIMPLE</option>
           <option value="CRON">CRON</option>
         </select>
@@ -219,6 +226,31 @@ onMounted(() => {
               <span>1시간마다 실행</span>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div>
+        <label class="block font-semibold">Misfire Policy</label>
+
+        <select v-model="jobData.misfirePolicy" class="input">
+          <template v-if="jobData.scheduleType === 'CRON'">
+            <option value="SMART_POLICY">기본 정책</option>
+            <option value="FIRE_AND_PROCEED">놓친 실행이 있으면 즉시 1회 실행</option>
+            <option value="DO_NOTHING">놓친 실행은 건너뛰기</option>
+          </template>
+
+          <template v-else-if="jobData.scheduleType === 'SIMPLE'">
+            <option value="SMART_POLICY">기본 정책</option>
+            <option value="FIRE_NOW">즉시 실행</option>
+            <option value="NOW_WITH_EXISTING_COUNT">즉시 실행 - 기존 반복 횟수 기준</option>
+            <option value="NOW_WITH_REMAINING_COUNT">즉시 실행 - 남은 반복 횟수 기준</option>
+            <option value="NEXT_WITH_EXISTING_COUNT">다음 실행 - 기존 반복 횟수 기준</option>
+            <option value="NEXT_WITH_REMAINING_COUNT">다음 실행 - 남은 반복 횟수 기준</option>
+          </template>
+        </select>
+
+        <div class="mt-1 text-sm text-gray-500">
+          예정된 실행 시간을 놓쳤을 때 처리할 방식을 선택합니다.
         </div>
       </div>
 

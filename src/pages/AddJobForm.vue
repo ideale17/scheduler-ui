@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { createJob, getJobClasses } from '@/api/jobApi'
 
@@ -13,6 +13,7 @@ const jobData = ref({
   jobGroup: '',
   scheduleType: 'CRON',
   scheduleExpr: '',
+  misfirePolicy: 'SMART_POLICY',
   params: {},
 })
 
@@ -26,10 +27,6 @@ const loadJobClasses = async () => {
     alert('Job 클래스 목록을 불러오지 못했습니다.')
   }
 }
-
-onMounted(() => {
-  loadJobClasses()
-})
 
 const addParam = () => {
   paramList.value.push({
@@ -108,6 +105,17 @@ const validateJob = () => {
 
   return true
 }
+
+onMounted(() => {
+  loadJobClasses()
+})
+
+watch(
+  () => jobData.value.scheduleType,
+  () => {
+    jobData.value.misfirePolicy = 'SMART_POLICY'
+  },
+)
 </script>
 
 <template>
@@ -204,6 +212,31 @@ const validateJob = () => {
               <span>1시간마다 실행</span>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div>
+        <label class="block font-semibold">Misfire Policy</label>
+
+        <select v-model="jobData.misfirePolicy" class="input">
+          <template v-if="jobData.scheduleType === 'CRON'">
+            <option value="SMART_POLICY">기본 정책</option>
+            <option value="FIRE_AND_PROCEED">놓친 실행이 있으면 즉시 1회 실행</option>
+            <option value="DO_NOTHING">놓친 실행은 건너뛰기</option>
+          </template>
+
+          <template v-else-if="jobData.scheduleType === 'SIMPLE'">
+            <option value="SMART_POLICY">기본 정책</option>
+            <option value="FIRE_NOW">즉시 실행</option>
+            <option value="NOW_WITH_EXISTING_COUNT">즉시 실행 - 기존 반복 횟수 기준</option>
+            <option value="NOW_WITH_REMAINING_COUNT">즉시 실행 - 남은 반복 횟수 기준</option>
+            <option value="NEXT_WITH_EXISTING_COUNT">다음 실행 - 기존 반복 횟수 기준</option>
+            <option value="NEXT_WITH_REMAINING_COUNT">다음 실행 - 남은 반복 횟수 기준</option>
+          </template>
+        </select>
+
+        <div class="mt-1 text-sm text-gray-500">
+          예정된 실행 시간을 놓쳤을 때 Quartz가 처리하는 방식을 선택합니다.
         </div>
       </div>
 
