@@ -43,6 +43,12 @@ export const runJob = (jobName, jobGroup) => {
   })
 }
 
+export const runJobs = (jobs) => {
+  return http.post('/jobs/runJobs', {
+    jobs,
+  })
+}
+
 export const pauseJob = (jobName, jobGroup) => {
   return http.post('/jobs/pauseJob', null, {
     params: {

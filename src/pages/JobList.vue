@@ -1,16 +1,33 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   deleteJob as deleteJobApi,
   getJobList,
   pauseJob as pauseJobApi,
   resumeJob as resumeJobApi,
-  runJob as runJobApi,
+  runJobs as runJobsApi,
 } from '@/api/jobApi'
 
 const router = useRouter()
 const jobList = ref([])
+const selectedJobKeys = ref([])
+
+const getJobKey = (job) => {
+  return `${job.jobGroup}:${job.jobName}`
+}
+
+const allSelected = computed({
+  get() {
+    return (
+      jobList.value.length > 0 &&
+      jobList.value.every((job) => selectedJobKeys.value.includes(getJobKey(job)))
+    )
+  },
+  set(checked) {
+    selectedJobKeys.value = checked ? jobList.value.map((job) => getJobKey(job)) : []
+  },
+})
 
 const fetchJobList = async () => {
   try {
@@ -21,10 +38,6 @@ const fetchJobList = async () => {
     jobList.value = []
   }
 }
-
-onMounted(() => {
-  fetchJobList()
-})
 
 const deleteJob = async (jobName, jobGroup) => {
   if (!confirm(`정말 ${jobGroup} 그룹의 ${jobName} Job을 삭제하시겠습니까?`)) return
@@ -42,17 +55,41 @@ const deleteJob = async (jobName, jobGroup) => {
   }
 }
 
-const runJob = async (jobName, jobGroup) => {
-  if (!confirm(`${jobGroup} 그룹의 ${jobName} Job을 즉시 실행하시겠습니까?`)) return
+const runSelectedJobs = async () => {
+  // 1. 선택된 Job이 있는지 확인한다.
+  if (selectedJobKeys.value.length === 0) {
+    alert('즉시 실행할 Job을 하나 이상 선택해주세요.')
+    return
+  }
+
+  // 2. 선택한 JobKey에 해당하는 Job 정보를 요청 형식으로 변환한다.
+  const selectedJobs = jobList.value
+    .filter((job) => selectedJobKeys.value.includes(getJobKey(job)))
+    .map((job) => ({
+      jobName: job.jobName,
+      jobGroup: job.jobGroup,
+    }))
+
+  // 3. 일괄 즉시 실행 여부를 확인한다.
+  if (!confirm(`선택한 ${selectedJobs.length}개의 Job을 즉시 실행하시겠습니까?`)) {
+    return
+  }
 
   try {
-    await runJobApi(jobName, jobGroup)
+    // 4. 선택한 Job의 일괄 즉시 실행 API를 호출한다.
+    const response = await runJobsApi(selectedJobs)
 
-    alert('Job 즉시 실행 요청 성공')
+    // 5. 실행 요청 결과를 사용자에게 안내한다.
+    alert(
+      `즉시 실행 요청 완료\n성공: ${response.data.successCount}건\n실패: ${response.data.failCount}건`,
+    )
+
+    // 6. 선택 상태를 초기화하고 최신 목록을 조회한다.
+    selectedJobKeys.value = []
     await fetchJobList()
   } catch (error) {
-    console.error('❌ 즉시 실행 실패:', error)
-    alert('즉시 실행 실패')
+    console.error('일괄 즉시 실행 실패:', error)
+    alert('일괄 즉시 실행에 실패했습니다.')
   }
 }
 
@@ -168,21 +205,39 @@ const formatFireTime = (fireTime) => {
 
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
 }
+
+onMounted(() => {
+  fetchJobList()
+})
 </script>
 
 <template>
   <div class="p-4">
-    <div class="flex justify-end items-center mb-4">
-      <!-- <h2 class="text-2xl font-bold">📋 등록된 Job 목록</h2> -->
-      <button @click="router.push('/add')" class="bg-blue-500 text-white px-3 py-1 rounded">
-        ➕ 새 Job 등록
-      </button>
+    <div class="mb-4">
+      <div class="mb-2 text-sm text-gray-500">선택된 Job: {{ selectedJobKeys.length }}개</div>
+
+      <div class="flex justify-between items-center">
+        <button
+          @click="runSelectedJobs"
+          :disabled="selectedJobKeys.length === 0"
+          class="bg-purple-500 text-white px-3 py-1 rounded text-sm hover:bg-purple-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+        >
+          즉시 실행
+        </button>
+
+        <button @click="router.push('/add')" class="bg-blue-500 text-white px-3 py-1 rounded">
+          ➕ 새 Job 등록
+        </button>
+      </div>
     </div>
 
     <!-- ✅ v-if 조건은 jobList.length 로만 -->
     <table v-if="jobList.length > 0" class="w-full border border-gray-300">
       <thead class="bg-gray-100">
         <tr>
+          <th class="border px-2 py-1 text-center">
+            <input v-model="allSelected" type="checkbox" />
+          </th>
           <th class="border px-2 py-1">Job 이름</th>
           <th class="border px-2 py-1">그룹</th>
           <th class="border px-2 py-1">상태</th>
@@ -194,6 +249,9 @@ const formatFireTime = (fireTime) => {
       </thead>
       <tbody>
         <tr v-for="job in jobList" :key="job.jobName + job.jobGroup">
+          <td class="border px-2 py-1 text-center">
+            <input v-model="selectedJobKeys" type="checkbox" :value="getJobKey(job)" />
+          </td>
           <td class="border px-2 py-1">{{ job.jobName }}</td>
           <td class="border px-2 py-1">{{ job.jobGroup }}</td>
           <td class="border px-2 py-1 text-center">
@@ -230,12 +288,6 @@ const formatFireTime = (fireTime) => {
             {{ formatFireTime(job.nextFireTime) }}
           </td>
           <td class="border px-2 py-1 text-center">
-            <button
-              @click="runJob(job.jobName, job.jobGroup)"
-              class="bg-purple-500 text-white px-2 py-1 rounded hover:bg-purple-600 text-sm mr-1"
-            >
-              즉시 실행
-            </button>
             <button
               @click="resumeJob(job.jobName, job.jobGroup)"
               class="bg-green-500 text-white px-2 py-1 rounded hover:bg-yellow-600 text-sm mr-1"
