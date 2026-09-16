@@ -4,8 +4,8 @@ import { useRouter } from 'vue-router'
 import {
   deleteJob as deleteJobApi,
   getJobList,
-  pauseJob as pauseJobApi,
-  resumeJob as resumeJobApi,
+  pauseJobs as pauseJobsApi,
+  resumeJobs as resumeJobsApi,
   runJobs as runJobsApi,
 } from '@/api/jobApi'
 
@@ -27,6 +27,15 @@ const allSelected = computed({
   set(checked) {
     selectedJobKeys.value = checked ? jobList.value.map((job) => getJobKey(job)) : []
   },
+})
+
+const selectedJobs = computed(() => {
+  return jobList.value
+    .filter((job) => selectedJobKeys.value.includes(getJobKey(job)))
+    .map((job) => ({
+      jobName: job.jobName,
+      jobGroup: job.jobGroup,
+    }))
 })
 
 const fetchJobList = async () => {
@@ -57,34 +66,26 @@ const deleteJob = async (jobName, jobGroup) => {
 
 const runSelectedJobs = async () => {
   // 1. 선택된 Job이 있는지 확인한다.
-  if (selectedJobKeys.value.length === 0) {
+  if (selectedJobs.value.length === 0) {
     alert('즉시 실행할 Job을 하나 이상 선택해주세요.')
     return
   }
 
-  // 2. 선택한 JobKey에 해당하는 Job 정보를 요청 형식으로 변환한다.
-  const selectedJobs = jobList.value
-    .filter((job) => selectedJobKeys.value.includes(getJobKey(job)))
-    .map((job) => ({
-      jobName: job.jobName,
-      jobGroup: job.jobGroup,
-    }))
-
-  // 3. 일괄 즉시 실행 여부를 확인한다.
-  if (!confirm(`선택한 ${selectedJobs.length}개의 Job을 즉시 실행하시겠습니까?`)) {
+  // 2. 일괄 즉시 실행 여부를 확인한다.
+  if (!confirm(`선택한 ${selectedJobs.value.length}개의 Job을 즉시 실행하시겠습니까?`)) {
     return
   }
 
   try {
-    // 4. 선택한 Job의 일괄 즉시 실행 API를 호출한다.
-    const response = await runJobsApi(selectedJobs)
+    // 3. 선택한 Job의 일괄 즉시 실행 API를 호출한다.
+    const response = await runJobsApi(selectedJobs.value)
 
-    // 5. 실행 요청 결과를 사용자에게 안내한다.
+    // 4. 실행 요청 결과를 사용자에게 안내한다.
     alert(
       `즉시 실행 요청 완료\n성공: ${response.data.successCount}건\n실패: ${response.data.failCount}건`,
     )
 
-    // 6. 선택 상태를 초기화하고 최신 목록을 조회한다.
+    // 5. 선택 상태를 초기화하고 최신 목록을 조회한다.
     selectedJobKeys.value = []
     await fetchJobList()
   } catch (error) {
@@ -93,31 +94,63 @@ const runSelectedJobs = async () => {
   }
 }
 
-const pauseJob = async (jobName, jobGroup) => {
-  if (!confirm(`⏸️ ${jobGroup} 그룹의 ${jobName} Job을 중지하시겠습니까?`)) return
+const pauseSelectedJobs = async () => {
+  // 1. 선택된 Job이 있는지 확인한다.
+  if (selectedJobs.value.length === 0) {
+    alert('중지할 Job을 하나 이상 선택해주세요.')
+    return
+  }
+
+  // 2. 일괄 중지 여부를 확인한다.
+  if (!confirm(`선택한 ${selectedJobs.value.length}개의 Job을 중지하시겠습니까?`)) {
+    return
+  }
 
   try {
-    await pauseJobApi(jobName, jobGroup)
+    // 3. 선택한 Job의 일괄 중지 API를 호출한다.
+    const response = await pauseJobsApi(selectedJobs.value)
 
-    alert('⏸️ Job 중지 성공')
+    // 4. 중지 결과를 사용자에게 안내한다.
+    alert(
+      `Job 중지 완료\n성공: ${response.data.successCount}건\n실패: ${response.data.failCount}건`,
+    )
+
+    // 5. 선택 상태를 초기화하고 최신 목록을 조회한다.
+    selectedJobKeys.value = []
     await fetchJobList()
   } catch (error) {
-    console.error('❌ 중지 실패:', error)
-    alert('중지 실패')
+    console.error('일괄 중지 실패:', error)
+    alert('Job 일괄 중지에 실패했습니다.')
   }
 }
 
-const resumeJob = async (jobName, jobGroup) => {
-  if (!confirm(`⏸️ ${jobGroup} 그룹의 ${jobName} Job을 재시작하시겠습니까?`)) return
+const resumeSelectedJobs = async () => {
+  // 1. 선택된 Job이 있는지 확인한다.
+  if (selectedJobs.value.length === 0) {
+    alert('시작할 Job을 하나 이상 선택해주세요.')
+    return
+  }
+
+  // 2. 일괄 시작 여부를 확인한다.
+  if (!confirm(`선택한 ${selectedJobs.value.length}개의 Job을 시작하시겠습니까?`)) {
+    return
+  }
 
   try {
-    await resumeJobApi(jobName, jobGroup)
+    // 3. 선택한 Job의 일괄 시작 API를 호출한다.
+    const response = await resumeJobsApi(selectedJobs.value)
 
-    alert('⏸️ Job 재시작 성공')
+    // 4. 시작 결과를 사용자에게 안내한다.
+    alert(
+      `Job 시작 완료\n성공: ${response.data.successCount}건\n실패: ${response.data.failCount}건`,
+    )
+
+    // 5. 선택 상태를 초기화하고 최신 목록을 조회한다.
+    selectedJobKeys.value = []
     await fetchJobList()
   } catch (error) {
-    console.error('❌ 재시작 실패:', error)
-    alert('재시작 실패')
+    console.error('일괄 시작 실패:', error)
+    alert('Job 일괄 시작에 실패했습니다.')
   }
 }
 
@@ -217,13 +250,31 @@ onMounted(() => {
       <div class="mb-2 text-sm text-gray-500">선택된 Job: {{ selectedJobKeys.length }}개</div>
 
       <div class="flex justify-between items-center">
-        <button
-          @click="runSelectedJobs"
-          :disabled="selectedJobKeys.length === 0"
-          class="bg-purple-500 text-white px-3 py-1 rounded text-sm hover:bg-purple-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
-        >
-          즉시 실행
-        </button>
+        <div class="flex items-center gap-2">
+          <button
+            @click="runSelectedJobs"
+            :disabled="selectedJobKeys.length === 0"
+            class="bg-purple-500 text-white px-3 py-1 rounded text-sm hover:bg-purple-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+          >
+            즉시 실행
+          </button>
+
+          <button
+            @click="resumeSelectedJobs"
+            :disabled="selectedJobKeys.length === 0"
+            class="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+          >
+            시작
+          </button>
+
+          <button
+            @click="pauseSelectedJobs"
+            :disabled="selectedJobKeys.length === 0"
+            class="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+          >
+            중지
+          </button>
+        </div>
 
         <button @click="router.push('/add')" class="bg-blue-500 text-white px-3 py-1 rounded">
           ➕ 새 Job 등록
@@ -288,18 +339,6 @@ onMounted(() => {
             {{ formatFireTime(job.nextFireTime) }}
           </td>
           <td class="border px-2 py-1 text-center">
-            <button
-              @click="resumeJob(job.jobName, job.jobGroup)"
-              class="bg-green-500 text-white px-2 py-1 rounded hover:bg-yellow-600 text-sm mr-1"
-            >
-              시작
-            </button>
-            <button
-              @click="pauseJob(job.jobName, job.jobGroup)"
-              class="bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600 text-sm mr-1"
-            >
-              중지
-            </button>
             <button
               @click="viewJobHistory(job.jobName, job.jobGroup)"
               class="bg-gray-600 text-white px-2 py-1 rounded hover:bg-gray-700 text-sm mr-1"

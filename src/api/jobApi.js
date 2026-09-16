@@ -66,3 +66,15 @@ export const resumeJob = (jobName, jobGroup) => {
     },
   })
 }
+
+export const pauseJobs = (jobs) => {
+  return http.post('/jobs/pauseJobs', {
+    jobs,
+  })
+}
+
+export const resumeJobs = (jobs) => {
+  return http.post('/jobs/resumeJobs', {
+    jobs,
+  })
+}
