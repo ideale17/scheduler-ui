@@ -12,6 +12,7 @@ import ExternalApiList from '@/pages/ExternalApiList.vue'
 import ExternalApiAdd from '@/pages/ExternalApiAdd.vue'
 import ExternalApiDetail from '@/pages/ExternalApiDetail.vue'
 import ExternalApiEdit from '@/pages/ExternalApiEdit.vue'
+import ExternalApiCallHistory from '@/pages/ExternalApiCallHistory.vue'
 
 const routes = [
   { path: '/login', component: LoginView, meta: { requiresAuth: false, public: true } },
@@ -45,18 +46,26 @@ const routes = [
         },
       },
       {
-        path: 'externalApi/add',
-        component: ExternalApiAdd,
-        meta: {
-          title: 'External API 등록',
-          requiresAuth: true,
-        },
-      },
-      {
         path: 'externalApi/:externalApiId',
         component: ExternalApiDetail,
         meta: {
           title: 'External API 상세',
+          requiresAuth: true,
+        },
+      },
+      {
+        path: 'externalApi/history',
+        component: ExternalApiCallHistory,
+        meta: {
+          title: 'External API 호출 이력',
+          requiresAuth: true,
+        },
+      },
+      {
+        path: 'externalApi/add',
+        component: ExternalApiAdd,
+        meta: {
+          title: 'External API 등록',
           requiresAuth: true,
         },
       },

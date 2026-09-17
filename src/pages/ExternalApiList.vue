@@ -56,6 +56,15 @@ const viewDetail = (externalApiId) => {
   router.push(`/externalApi/${externalApiId}`)
 }
 
+const viewCallHistory = (externalApi) => {
+  router.push({
+    path: '/externalApi/history',
+    query: {
+      apiName: externalApi.apiName,
+    },
+  })
+}
+
 onMounted(() => {
   fetchExternalApiList()
 })
@@ -122,6 +131,13 @@ onMounted(() => {
               class="bg-gray-600 text-white px-2 py-1 rounded hover:bg-gray-700 text-sm mr-1"
             >
               상세
+            </button>
+
+            <button
+              @click="viewCallHistory(externalApi)"
+              class="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 text-sm mr-1"
+            >
+              호출 이력
             </button>
 
             <button
