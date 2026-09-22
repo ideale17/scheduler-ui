@@ -135,6 +135,10 @@ const isExternalApiCallJob = (jobClassName) => {
   return jobClassName?.endsWith('com.kji.scheduler.job.ExternalApiCallJob')
 }
 
+const getJobClassSimpleName = (jobClassName) => {
+  return jobClassName?.split('.').pop() || ''
+}
+
 onMounted(() => {
   loadJobClasses()
 })
@@ -171,7 +175,7 @@ watch(
           <option value="" disabled>Job 클래스를 선택해주세요.</option>
 
           <option v-for="jobClass in jobClasses" :key="jobClass" :value="jobClass">
-            {{ jobClass }}
+            {{ getJobClassSimpleName(jobClass) }}
           </option>
         </select>
       </div>
