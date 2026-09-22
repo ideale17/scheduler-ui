@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getJob, updateJob } from '@/api/jobApi'
+import { getExternalApiList } from '@/api/externalApi'
 
 const route = useRoute()
 const router = useRouter()
@@ -9,6 +10,8 @@ const router = useRouter()
 const isLoading = ref(false)
 const isSubmitting = ref(false)
 const paramList = ref([])
+const externalApiList = ref([])
+const selectedExternalApiId = ref('')
 
 const jobData = ref({
   jobClassName: '',
@@ -40,10 +43,20 @@ const loadJob = async () => {
       misfirePolicy: job.misfirePolicy || 'SMART_POLICY',
     }
 
-    paramList.value = Object.entries(job.params || {}).map(([key, value]) => ({
-      key,
-      value: String(value ?? ''),
-    }))
+    if (isExternalApiCallJob(job.jobClassName)) {
+      await loadExternalApiList()
+
+      selectedExternalApiId.value = job.params?.externalApiId
+        ? Number(job.params.externalApiId)
+        : ''
+
+      paramList.value = []
+    } else {
+      paramList.value = Object.entries(job.params || {}).map(([key, value]) => ({
+        key,
+        value: String(value ?? ''),
+      }))
+    }
   } catch (error) {
     console.error('Job 정보 조회 실패:', error)
     alert('Job 정보를 불러오지 못했습니다.')
@@ -73,6 +86,11 @@ const validateJob = () => {
     }
   }
 
+  if (isExternalApiCallJob(jobData.value.jobClassName) && !selectedExternalApiId.value) {
+    alert('External API를 선택해주세요.')
+    return false
+  }
+
   return true
 }
 
@@ -89,18 +107,23 @@ const handleUpdateJob = async () => {
     return
   }
 
+  // 3. Job 유형에 따라 실행 파라미터를 구성한다.
+  const params = isExternalApiCallJob(jobData.value.jobClassName)
+    ? { externalApiId: selectedExternalApiId.value }
+    : buildParams()
+
   try {
-    // 3. Job 수정 API를 호출한다.
+    // 4. Job 수정 API를 호출한다.
     const response = await updateJob({
       jobName: jobData.value.jobName,
       jobGroup: jobData.value.jobGroup,
       scheduleType: jobData.value.scheduleType,
       scheduleExpr: jobData.value.scheduleExpr.trim(),
       misfirePolicy: jobData.value.misfirePolicy,
-      params: buildParams(),
+      params,
     })
 
-    // 4. 수정 성공 후 목록 화면으로 이동한다.
+    // 5. 수정 성공 후 목록 화면으로 이동한다.
     alert('Job 수정 성공')
     console.log(response.data)
 
@@ -133,6 +156,26 @@ const changeScheduleType = () => {
   jobData.value.misfirePolicy = 'SMART_POLICY'
 }
 
+const isExternalApiCallJob = (jobClassName) => {
+  return jobClassName === 'com.kji.scheduler.job.ExternalApiCallJob'
+}
+
+const getJobClassSimpleName = (jobClassName) => {
+  return jobClassName?.split('.').pop() || ''
+}
+
+const loadExternalApiList = async () => {
+  try {
+    const response = await getExternalApiList()
+
+    externalApiList.value = Array.isArray(response.data) ? response.data : []
+  } catch (error) {
+    console.error('External API 목록 조회 실패:', error)
+    externalApiList.value = []
+    alert('External API 목록을 불러오지 못했습니다.')
+  }
+}
+
 onMounted(() => {
   loadJob()
 })
@@ -145,7 +188,12 @@ onMounted(() => {
     <form v-else @submit.prevent="handleUpdateJob" class="space-y-4">
       <div>
         <label class="block font-semibold">Job Class Name</label>
-        <input v-model="jobData.jobClassName" class="input bg-gray-100" type="text" disabled />
+        <input
+          :value="getJobClassSimpleName(jobData.jobClassName)"
+          class="input bg-gray-100"
+          type="text"
+          disabled
+        />
       </div>
 
       <div>
@@ -254,7 +302,36 @@ onMounted(() => {
         </div>
       </div>
 
-      <fieldset class="border border-gray-300 p-4 rounded">
+      <!-- ExternalApiCallJob 수정 시 -->
+      <fieldset
+        v-if="isExternalApiCallJob(jobData.jobClassName)"
+        class="border border-gray-300 p-4 rounded"
+      >
+        <legend class="font-bold">External API</legend>
+
+        <div>
+          <label class="block font-semibold">External API 선택</label>
+
+          <select v-model="selectedExternalApiId" class="input">
+            <option value="" disabled>External API를 선택해주세요.</option>
+
+            <option
+              v-for="externalApi in externalApiList"
+              :key="externalApi.externalApiId"
+              :value="externalApi.externalApiId"
+            >
+              {{ externalApi.apiName }}
+            </option>
+          </select>
+        </div>
+
+        <div v-if="externalApiList.length === 0" class="mt-2 text-sm text-gray-500">
+          등록된 External API가 없습니다.
+        </div>
+      </fieldset>
+
+      <!-- 일반 Job 수정 시 -->
+      <fieldset v-else class="border border-gray-300 p-4 rounded">
         <legend class="font-bold">파라미터 (params)</legend>
 
         <div
