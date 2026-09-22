@@ -7,7 +7,6 @@ const route = useRoute()
 const router = useRouter()
 
 const menus = [
-  { to: '/', label: 'Dashboard' },
   { to: '/jobList', label: 'Job 목록' },
   { to: '/JobHistory', label: 'Job 이력 목록' },
   { to: '/externalApi', label: 'External API' },
@@ -44,7 +43,9 @@ const logout = async () => {
   <div class="min-h-screen bg-gray-50 text-gray-900 flex">
     <!-- 왼쪽 메뉴 -->
     <aside class="w-56 bg-white border-r min-h-screen">
-      <div class="h-14 flex items-center px-4 font-semibold">🗓 Scheduler UI</div>
+      <RouterLink to="/" class="h-14 flex items-center px-4 font-semibold hover:bg-gray-50">
+        🗓 Scheduler
+      </RouterLink>
       <nav class="px-2 py-2 space-y-1">
         <RouterLink
           v-for="m in menus"
