@@ -187,6 +187,27 @@ onMounted(() => {
           </div>
 
           <div>
+            <div class="text-sm text-gray-500">재시도 사용 여부</div>
+
+            <span
+              class="inline-flex mt-1 rounded-full px-2 py-0.5 text-xs font-medium"
+              :class="getEnabledClass(externalApi.retryEnabled)"
+            >
+              {{ getEnabledLabel(externalApi.retryEnabled) }}
+            </span>
+          </div>
+
+          <div v-if="externalApi.retryEnabled === 'Y'">
+            <div class="text-sm text-gray-500">최대 재시도 횟수</div>
+            <div class="mt-1">{{ externalApi.maxRetryCount }}회</div>
+          </div>
+
+          <div v-if="externalApi.retryEnabled === 'Y'">
+            <div class="text-sm text-gray-500">재시도 간격</div>
+            <div class="mt-1">{{ externalApi.retryIntervalSec }}초</div>
+          </div>
+
+          <div>
             <div class="text-sm text-gray-500">설명</div>
             <div class="mt-1">
               {{ externalApi.description || '-' }}

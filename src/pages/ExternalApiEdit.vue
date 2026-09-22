@@ -11,6 +11,9 @@ const externalApi = ref({
   apiUrl: '',
   httpMethod: 'GET',
   enabled: 'Y',
+  retryEnabled: 'N',
+  maxRetryCount: '',
+  retryIntervalSec: '',
   description: '',
 })
 
@@ -34,6 +37,15 @@ const fetchExternalApi = async () => {
       apiUrl: externalApiResponse.data.apiUrl,
       httpMethod: externalApiResponse.data.httpMethod,
       enabled: externalApiResponse.data.enabled,
+      retryEnabled: externalApiResponse.data.retryEnabled ?? 'N',
+      maxRetryCount:
+        externalApiResponse.data.retryEnabled === 'Y'
+          ? (externalApiResponse.data.maxRetryCount ?? '')
+          : '',
+      retryIntervalSec:
+        externalApiResponse.data.retryEnabled === 'Y'
+          ? (externalApiResponse.data.retryIntervalSec ?? '')
+          : '',
       description: externalApiResponse.data.description || '',
     }
 
@@ -96,6 +108,18 @@ const validateForm = () => {
     return false
   }
 
+  if (externalApi.value.retryEnabled === 'Y') {
+    if (!externalApi.value.maxRetryCount) {
+      alert('최대 재시도 횟수를 선택해주세요.')
+      return false
+    }
+
+    if (!externalApi.value.retryIntervalSec) {
+      alert('재시도 간격을 선택해주세요.')
+      return false
+    }
+  }
+
   for (let i = 0; i < params.value.length; i += 1) {
     const param = params.value[i]
 
@@ -125,6 +149,11 @@ const editExternalApi = async () => {
 
   if (!confirm('External API를 수정하시겠습니까?')) {
     return
+  }
+
+  if (externalApi.value.retryEnabled === 'N') {
+    externalApi.value.maxRetryCount = 0
+    externalApi.value.retryIntervalSec = 0
   }
 
   try {
@@ -202,6 +231,50 @@ onMounted(() => {
               <option value="Y">사용</option>
               <option value="N">미사용</option>
             </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">재시도 사용 여부</label>
+            <select v-model="externalApi.retryEnabled" class="w-full border rounded px-3 py-2">
+              <option value="N">미사용</option>
+              <option value="Y">사용</option>
+            </select>
+          </div>
+
+          <div v-if="externalApi.retryEnabled === 'Y'">
+            <label class="block text-sm font-medium mb-1">최대 재시도 횟수</label>
+            <select
+              v-model.number="externalApi.maxRetryCount"
+              class="w-full border rounded px-3 py-2"
+            >
+              <option value="">선택</option>
+              <option :value="1">1회</option>
+              <option :value="2">2회</option>
+              <option :value="3">3회</option>
+              <option :value="5">5회</option>
+            </select>
+          </div>
+
+          <div v-if="externalApi.retryEnabled === 'Y'">
+            <label class="block text-sm font-medium mb-1">재시도 간격</label>
+            <select
+              v-model.number="externalApi.retryIntervalSec"
+              class="w-full border rounded px-3 py-2"
+            >
+              <option value="">선택</option>
+              <option :value="5">5초</option>
+              <option :value="10">10초</option>
+              <option :value="30">30초</option>
+              <option :value="60">1분</option>
+            </select>
+          </div>
+
+          <div class="col-span-2">
+            <label class="block text-sm font-medium mb-1">설명</label>
+            <input
+              v-model="externalApi.description"
+              type="text"
+              class="w-full border rounded px-3 py-2"
+            />
           </div>
 
           <div>
