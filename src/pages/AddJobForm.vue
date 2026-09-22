@@ -132,7 +132,7 @@ const validateJob = () => {
   return true
 }
 const isExternalApiCallJob = (jobClassName) => {
-  return jobClassName?.endsWith('com.kji.scheduler.job.ExternalApiCallJob')
+  return jobClassName === 'com.kji.scheduler.job.ExternalApiCallJob'
 }
 
 const getJobClassSimpleName = (jobClassName) => {
