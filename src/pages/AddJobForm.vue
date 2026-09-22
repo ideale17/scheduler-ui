@@ -2,10 +2,13 @@
 import { onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { createJob, getJobClasses } from '@/api/jobApi'
+import { getExternalApiList } from '@/api/externalApi'
 
 const router = useRouter()
 const jobClasses = ref([])
 const paramList = ref([])
+const externalApiList = ref([])
+const selectedExternalApiId = ref('')
 
 const jobData = ref({
   jobClassName: '',
@@ -25,6 +28,18 @@ const loadJobClasses = async () => {
   } catch (error) {
     console.error('Job 클래스 목록 조회 실패:', error)
     alert('Job 클래스 목록을 불러오지 못했습니다.')
+  }
+}
+
+const loadExternalApiList = async () => {
+  try {
+    const response = await getExternalApiList()
+
+    externalApiList.value = Array.isArray(response.data) ? response.data : []
+  } catch (error) {
+    console.error('External API 목록 조회 실패:', error)
+    externalApiList.value = []
+    alert('External API 목록을 불러오지 못했습니다.')
   }
 }
 
@@ -60,8 +75,14 @@ const addJob = async () => {
   }
 
   try {
-    // 3. 화면의 Key/Value 목록을 백엔드 요청 형식의 params 객체로 변환한다.
-    jobData.value.params = buildParams()
+    // 3. Job 유형에 따라 실행 파라미터를 구성한다.
+    if (isExternalApiCallJob(jobData.value.jobClassName)) {
+      jobData.value.params = {
+        externalApiId: selectedExternalApiId.value,
+      }
+    } else {
+      jobData.value.params = buildParams()
+    }
 
     // 4. Job 등록 API를 호출한다.
     const response = await createJob(jobData.value)
@@ -103,7 +124,15 @@ const validateJob = () => {
     return false
   }
 
+  if (isExternalApiCallJob(jobData.value.jobClassName) && !selectedExternalApiId.value) {
+    alert('External API를 선택해주세요.')
+    return false
+  }
+
   return true
+}
+const isExternalApiCallJob = (jobClassName) => {
+  return jobClassName?.endsWith('com.kji.scheduler.job.ExternalApiCallJob')
 }
 
 onMounted(() => {
@@ -114,6 +143,19 @@ watch(
   () => jobData.value.scheduleType,
   () => {
     jobData.value.misfirePolicy = 'SMART_POLICY'
+  },
+)
+
+watch(
+  () => jobData.value.jobClassName,
+  async (jobClassName) => {
+    if (isExternalApiCallJob(jobClassName)) {
+      await loadExternalApiList()
+      paramList.value = []
+      return
+    }
+
+    selectedExternalApiId.value = ''
   },
 )
 </script>
@@ -240,7 +282,36 @@ watch(
         </div>
       </div>
 
-      <fieldset class="border border-gray-300 p-4 rounded">
+      <!-- ExternalApiCallJob 선택 시 -->
+      <fieldset
+        v-if="isExternalApiCallJob(jobData.jobClassName)"
+        class="border border-gray-300 p-4 rounded"
+      >
+        <legend class="font-bold">External API</legend>
+
+        <div>
+          <label class="block font-semibold">External API 선택</label>
+
+          <select v-model="selectedExternalApiId" class="input">
+            <option value="" disabled>External API를 선택해주세요.</option>
+
+            <option
+              v-for="externalApi in externalApiList"
+              :key="externalApi.externalApiId"
+              :value="externalApi.externalApiId"
+            >
+              {{ externalApi.apiName }}
+            </option>
+          </select>
+        </div>
+
+        <div v-if="externalApiList.length === 0" class="mt-2 text-sm text-gray-500">
+          등록된 External API가 없습니다.
+        </div>
+      </fieldset>
+
+      <!-- 그 외 일반 Job 선택 시 기존 params UI -->
+      <fieldset v-else class="border border-gray-300 p-4 rounded">
         <legend class="font-bold">파라미터 (params)</legend>
 
         <div
