@@ -1,11 +1,16 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { getExternalApiCallHistory } from '@/api/externalApiCallHistoryApi'
+import {
+  getExternalApiCallHistory,
+  getExternalApiCallHistoryDetail,
+} from '@/api/externalApiCallHistoryApi'
 
 // 1. 화면 상태
 const historyList = ref([])
 const selectedHistoryId = ref(null)
+const detailList = ref([])
+const detailLoading = ref(false)
 
 const searchCondition = ref({
   apiName: '',
@@ -125,8 +130,31 @@ const changePage = async (page) => {
 }
 
 // 6. 상세
-const toggleHistoryDetail = (executionId) => {
-  selectedHistoryId.value = selectedHistoryId.value === executionId ? null : executionId
+const toggleHistoryDetail = async (executionId) => {
+  // 1. 현재 열려 있는 상세를 다시 클릭하면 닫는다.
+  if (selectedHistoryId.value === executionId) {
+    selectedHistoryId.value = null
+    detailList.value = []
+    return
+  }
+
+  // 2. 선택한 External API 실행 상세를 연다.
+  selectedHistoryId.value = executionId
+  detailList.value = []
+  detailLoading.value = true
+
+  try {
+    // 3. 실행 식별자로 개별 호출 시도 이력을 조회한다.
+    const response = await getExternalApiCallHistoryDetail(executionId)
+
+    // 4. 조회 결과를 상세 목록에 저장한다.
+    detailList.value = Array.isArray(response.data) ? response.data : []
+  } catch (error) {
+    console.error('External API 호출 상세 이력 조회 실패:', error)
+    detailList.value = []
+  } finally {
+    detailLoading.value = false
+  }
 }
 
 // 7. 화면 표시용 변환
@@ -319,48 +347,62 @@ onMounted(() => {
             <!-- 상세 -->
             <tr v-if="selectedHistoryId === history.executionId">
               <td colspan="9" class="border bg-gray-50 p-4">
-                <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-                  <div class="rounded border border-gray-200 bg-gray-50 p-3">
-                    <div class="mb-1 text-xs text-gray-500">Execution ID</div>
-                    <div class="break-all text-sm text-gray-800">
-                      {{ history.executionId }}
-                    </div>
-                  </div>
+                <div class="mt-4 border-t border-gray-200 pt-4">
+                  <h4 class="mb-3 text-sm font-semibold text-gray-800">호출 시도 이력</h4>
 
-                  <div class="rounded border border-gray-200 bg-gray-50 p-3">
-                    <div class="mb-1 text-xs text-gray-500">External API ID</div>
-                    <div class="text-sm text-gray-800">
-                      {{ history.externalApiId }}
-                    </div>
-                  </div>
+                  <div v-if="detailLoading" class="text-sm text-gray-500">조회 중...</div>
 
-                  <div class="rounded border border-gray-200 bg-gray-50 p-3">
-                    <div class="mb-1 text-xs text-gray-500">Fire Instance ID</div>
-                    <div class="break-all text-sm text-gray-800">
-                      {{ history.fireInstanceId ?? '-' }}
-                    </div>
-                  </div>
+                  <table
+                    v-else-if="detailList.length > 0"
+                    class="w-full border border-gray-300 text-sm"
+                  >
+                    <thead class="bg-gray-100">
+                      <tr>
+                        <th class="border px-2 py-1">호출 구분</th>
+                        <th class="border px-2 py-1">상태</th>
+                        <th class="border px-2 py-1">HTTP</th>
+                        <th class="border px-2 py-1">시작시간</th>
+                        <th class="border px-2 py-1">호출시간</th>
+                        <th class="border px-2 py-1">오류</th>
+                      </tr>
+                    </thead>
 
-                  <div class="rounded border border-gray-200 bg-gray-50 p-3">
-                    <div class="mb-1 text-xs text-gray-500">종료시간</div>
-                    <div class="text-sm text-gray-800">
-                      {{ formatDateTime(history.finishedAt) }}
-                    </div>
-                  </div>
+                    <tbody>
+                      <tr v-for="detail in detailList" :key="detail.apiCallLogId">
+                        <td class="border px-2 py-1 text-center">
+                          {{
+                            detail.attemptNo === 1 ? '최초 호출' : `재시도 ${detail.attemptNo - 1}`
+                          }}
+                        </td>
 
-                  <div class="rounded border border-gray-200 bg-gray-50 p-3">
-                    <div class="mb-1 text-xs text-gray-500">전체 실행시간</div>
-                    <div class="text-sm text-gray-800">
-                      {{ formatRunMillis(history.totalRunMillis) }}
-                    </div>
-                  </div>
+                        <td class="border px-2 py-1 text-center">
+                          <span v-if="detail.status === 'SUCCESS'" class="text-green-700">
+                            성공
+                          </span>
 
-                  <div class="rounded border border-gray-200 bg-gray-50 p-3">
-                    <div class="mb-1 text-xs text-gray-500">실제 API 호출시간</div>
-                    <div class="text-sm text-gray-800">
-                      {{ formatRunMillis(history.apiRunMillis) }}
-                    </div>
-                  </div>
+                          <span v-else class="text-red-700">실패</span>
+                        </td>
+
+                        <td class="border px-2 py-1 text-center">
+                          {{ detail.httpStatus ?? '-' }}
+                        </td>
+
+                        <td class="border px-2 py-1">
+                          {{ formatDateTime(detail.startedAt) }}
+                        </td>
+
+                        <td class="border px-2 py-1">
+                          {{ formatRunMillis(detail.runMillis) }}
+                        </td>
+
+                        <td class="border px-2 py-1">
+                          {{ detail.errorMessage || '-' }}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+
+                  <div v-else class="text-sm text-gray-500">호출 시도 이력이 없습니다.</div>
                 </div>
               </td>
             </tr>
