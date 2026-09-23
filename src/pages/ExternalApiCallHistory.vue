@@ -125,8 +125,8 @@ const changePage = async (page) => {
 }
 
 // 6. 상세
-const toggleHistoryDetail = (apiCallLogId) => {
-  selectedHistoryId.value = selectedHistoryId.value === apiCallLogId ? null : apiCallLogId
+const toggleHistoryDetail = (executionId) => {
+  selectedHistoryId.value = selectedHistoryId.value === executionId ? null : executionId
 }
 
 // 7. 화면 표시용 변환
@@ -244,32 +244,26 @@ onMounted(() => {
         <thead class="bg-gray-100">
           <tr>
             <th class="border px-2 py-1">API명</th>
-            <th class="border px-2 py-1">HTTP 상태</th>
-            <th class="border px-2 py-1">호출 시작시간</th>
-            <th class="border px-2 py-1">소요시간</th>
-            <th class="border px-2 py-1">호출 상태</th>
+            <th class="border px-2 py-1">시작시간</th>
+            <th class="border px-2 py-1">상태</th>
+            <th class="border px-2 py-1">시도횟수</th>
+            <th class="border px-2 py-1">재시도</th>
+            <th class="border px-2 py-1">전체시간</th>
+            <th class="border px-2 py-1">API시간</th>
             <th class="border px-2 py-1">실행 구분</th>
             <th class="border px-2 py-1">상세</th>
           </tr>
         </thead>
 
         <tbody>
-          <template v-for="history in historyList" :key="history.apiCallLogId">
+          <template v-for="history in historyList" :key="history.executionId">
             <tr>
               <td class="border px-2 py-1">
                 {{ history.apiName || `API #${history.externalApiId}` }}
               </td>
 
-              <td class="border px-2 py-1 text-center">
-                {{ history.httpStatus ?? '-' }}
-              </td>
-
               <td class="border px-2 py-1">
                 {{ formatDateTime(history.startedAt) }}
-              </td>
-
-              <td class="border px-2 py-1">
-                {{ formatRunMillis(history.runMillis) }}
               </td>
 
               <td class="border px-2 py-1 text-center">
@@ -295,6 +289,18 @@ onMounted(() => {
                 </span>
               </td>
 
+              <td class="border px-2 py-1 text-center">{{ history.attemptCount }}회</td>
+
+              <td class="border px-2 py-1 text-center">{{ history.retryCount }}회</td>
+
+              <td class="border px-2 py-1">
+                {{ formatRunMillis(history.totalRunMillis) }}
+              </td>
+
+              <td class="border px-2 py-1">
+                {{ formatRunMillis(history.apiRunMillis) }}
+              </td>
+
               <td class="border px-2 py-1 text-center">
                 {{ getExecutionType(history.fireInstanceId) }}
               </td>
@@ -303,68 +309,56 @@ onMounted(() => {
                 <button
                   type="button"
                   class="rounded border border-gray-300 bg-white px-3 py-1 text-xs text-gray-700 hover:bg-gray-50"
-                  @click="toggleHistoryDetail(history.apiCallLogId)"
+                  @click="toggleHistoryDetail(history.executionId)"
                 >
-                  {{ selectedHistoryId === history.apiCallLogId ? '닫기' : '상세' }}
+                  {{ selectedHistoryId === history.executionId ? '닫기' : '상세' }}
                 </button>
               </td>
             </tr>
 
             <!-- 상세 -->
-            <tr v-if="selectedHistoryId === history.apiCallLogId">
-              <td colspan="7" class="border bg-gray-50 p-4">
-                <div class="rounded-lg border border-gray-200 bg-white p-4">
-                  <h3 class="mb-4 text-sm font-semibold text-gray-800">
-                    External API 호출 상세 정보
-                  </h3>
-
-                  <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-                    <div class="rounded border border-gray-200 bg-gray-50 p-3">
-                      <div class="mb-1 text-xs text-gray-500">호출 이력 ID</div>
-                      <div class="text-sm text-gray-800">
-                        {{ history.apiCallLogId ?? '-' }}
-                      </div>
-                    </div>
-
-                    <div class="rounded border border-gray-200 bg-gray-50 p-3">
-                      <div class="mb-1 text-xs text-gray-500">External API ID</div>
-                      <div class="text-sm text-gray-800">
-                        {{ history.externalApiId ?? '-' }}
-                      </div>
-                    </div>
-
-                    <div class="rounded border border-gray-200 bg-gray-50 p-3">
-                      <div class="mb-1 text-xs text-gray-500">Fire Instance ID</div>
-                      <div class="break-all text-sm text-gray-800">
-                        {{ history.fireInstanceId ?? '-' }}
-                      </div>
-                    </div>
-
-                    <div class="rounded border border-gray-200 bg-gray-50 p-3">
-                      <div class="mb-1 text-xs text-gray-500">종료시간</div>
-                      <div class="text-sm text-gray-800">
-                        {{ formatDateTime(history.finishedAt) }}
-                      </div>
-                    </div>
-
-                    <div class="rounded border border-gray-200 bg-gray-50 p-3">
-                      <div class="mb-1 text-xs text-gray-500">생성시간</div>
-                      <div class="text-sm text-gray-800">
-                        {{ formatDateTime(history.createdAt) }}
-                      </div>
+            <tr v-if="selectedHistoryId === history.executionId">
+              <td colspan="9" class="border bg-gray-50 p-4">
+                <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+                  <div class="rounded border border-gray-200 bg-gray-50 p-3">
+                    <div class="mb-1 text-xs text-gray-500">Execution ID</div>
+                    <div class="break-all text-sm text-gray-800">
+                      {{ history.executionId }}
                     </div>
                   </div>
 
-                  <div
-                    v-if="history.status === 'FAILED'"
-                    class="mt-4 border-t border-gray-200 pt-4"
-                  >
-                    <div class="mb-2 text-sm font-medium text-red-700">오류 메시지</div>
+                  <div class="rounded border border-gray-200 bg-gray-50 p-3">
+                    <div class="mb-1 text-xs text-gray-500">External API ID</div>
+                    <div class="text-sm text-gray-800">
+                      {{ history.externalApiId }}
+                    </div>
+                  </div>
 
-                    <div
-                      class="whitespace-pre-wrap break-all rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-                    >
-                      {{ history.errorMessage || '오류 메시지가 없습니다.' }}
+                  <div class="rounded border border-gray-200 bg-gray-50 p-3">
+                    <div class="mb-1 text-xs text-gray-500">Fire Instance ID</div>
+                    <div class="break-all text-sm text-gray-800">
+                      {{ history.fireInstanceId ?? '-' }}
+                    </div>
+                  </div>
+
+                  <div class="rounded border border-gray-200 bg-gray-50 p-3">
+                    <div class="mb-1 text-xs text-gray-500">종료시간</div>
+                    <div class="text-sm text-gray-800">
+                      {{ formatDateTime(history.finishedAt) }}
+                    </div>
+                  </div>
+
+                  <div class="rounded border border-gray-200 bg-gray-50 p-3">
+                    <div class="mb-1 text-xs text-gray-500">전체 실행시간</div>
+                    <div class="text-sm text-gray-800">
+                      {{ formatRunMillis(history.totalRunMillis) }}
+                    </div>
+                  </div>
+
+                  <div class="rounded border border-gray-200 bg-gray-50 p-3">
+                    <div class="mb-1 text-xs text-gray-500">실제 API 호출시간</div>
+                    <div class="text-sm text-gray-800">
+                      {{ formatRunMillis(history.apiRunMillis) }}
                     </div>
                   </div>
                 </div>
