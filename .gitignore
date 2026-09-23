@@ -7,6 +7,9 @@ dist-ssr/
 # env
 .env
 .env.*
+!.env.development
+!.env.production
+!.env.example
 # logs
 *.log
 # editor/os
