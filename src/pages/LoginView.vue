@@ -35,6 +35,10 @@ const login = async () => {
 
       <button type="submit" class="border p-2 w-full">로그인</button>
 
+      <button type="button" class="border p-2 w-full" @click="router.push('/signup')">
+        회원가입
+      </button>
+
       <p v-if="err" class="text-red-500 text-sm">
         {{ err }}
       </p>

@@ -1,11 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import AppLayout from '@/layouts/AppLayout.vue'
+import LoginView from '@/pages/LoginView.vue'
+import SignupView from '@/pages/SignupView.vue'
 import DashboardView from '@/pages/DashboardView.vue'
 import JobList from '@/pages/JobList.vue'
 import AddJobForm from '@/pages/AddJobForm.vue'
 import EditJob from '@/pages/EditJob.vue'
 import JobHistory from '@/pages/JobHistory.vue'
-import LoginView from '@/pages/LoginView.vue'
 import SchedulerInfoView from '@/pages/SchedulerInfoView.vue'
 import { getCurrentUser } from '@/api/authApi'
 import ExternalApiList from '@/pages/ExternalApiList.vue'
@@ -16,6 +17,7 @@ import ExternalApiCallHistory from '@/pages/ExternalApiCallHistory.vue'
 
 const routes = [
   { path: '/login', component: LoginView, meta: { requiresAuth: false, public: true } },
+  { path: '/signup', component: SignupView, meta: { requiresAuth: false, public: true } },
   {
     path: '/',
     component: AppLayout,
@@ -99,7 +101,7 @@ router.beforeEach(async (to, from, next) => {
 
   if (!needsAuth) {
     // 로그인 페이지에 이미 로그인 상태로 들어오면 홈으로
-    if (to.path === '/login') {
+    if (to.path === '/login' || to.path === '/signup') {
       try {
         const { data } = await getCurrentUser()
 
