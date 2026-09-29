@@ -11,6 +11,16 @@ const externalApi = ref({
   apiUrl: '',
   httpMethod: 'GET',
   enabled: 'Y',
+
+  authType: 'NONE',
+  authLocation: '',
+  authKey: '',
+  authValue: '',
+  authUsername: '',
+  authPassword: '',
+  authValueConfigured: false,
+  authPasswordConfigured: false,
+
   retryEnabled: 'N',
   maxRetryCount: '',
   retryIntervalSec: '',
@@ -19,6 +29,7 @@ const externalApi = ref({
 
 const params = ref([])
 const loading = ref(true)
+const savedAuthType = ref('NONE')
 
 const fetchExternalApi = async () => {
   try {
@@ -31,12 +42,30 @@ const fetchExternalApi = async () => {
       getExternalApiParams(externalApiId),
     ])
 
+    savedAuthType.value = externalApiResponse.data.authType ?? 'NONE'
+
     // 3. 조회한 기본정보를 수정 화면에 설정한다.
     externalApi.value = {
       apiName: externalApiResponse.data.apiName,
       apiUrl: externalApiResponse.data.apiUrl,
       httpMethod: externalApiResponse.data.httpMethod,
       enabled: externalApiResponse.data.enabled,
+
+      authType: externalApiResponse.data.authType || 'NONE',
+      authLocation: externalApiResponse.data.authLocation || '',
+      authKey: externalApiResponse.data.authKey || '',
+
+      // 비밀값은 서버에서 조회하지 않고 새 값 입력용으로 비워둔다.
+      authValue: '',
+
+      authUsername: externalApiResponse.data.authUsername || '',
+
+      // 비밀값은 서버에서 조회하지 않고 새 값 입력용으로 비워둔다.
+      authPassword: '',
+
+      authValueConfigured: externalApiResponse.data.authValueConfigured ?? false,
+      authPasswordConfigured: externalApiResponse.data.authPasswordConfigured ?? false,
+
       retryEnabled: externalApiResponse.data.retryEnabled ?? 'N',
       maxRetryCount:
         externalApiResponse.data.retryEnabled === 'Y'
@@ -84,6 +113,15 @@ const createEmptyParam = () => {
   }
 }
 
+const changeAuthType = () => {
+  // 1. 사용자가 인증 방식을 변경하면 기존 인증 입력값을 초기화한다.
+  externalApi.value.authLocation = ''
+  externalApi.value.authKey = ''
+  externalApi.value.authValue = ''
+  externalApi.value.authUsername = ''
+  externalApi.value.authPassword = ''
+}
+
 const addParam = () => {
   params.value.push(createEmptyParam())
 }
@@ -98,6 +136,7 @@ const removeParam = (index) => {
 }
 
 const validateForm = () => {
+  // 기본 정보 입력값을 검증한다.
   if (!externalApi.value.apiName.trim()) {
     alert('API 이름을 입력해주세요.')
     return false
@@ -120,6 +159,53 @@ const validateForm = () => {
     }
   }
 
+  // 인증 방식별 필수 입력값을 검증한다.
+  if (externalApi.value.authType === 'API_KEY') {
+    if (!externalApi.value.authLocation) {
+      alert('API Key 전달 위치를 선택해주세요.')
+      return false
+    }
+
+    if (!externalApi.value.authKey.trim()) {
+      alert('API Key 이름을 입력해주세요.')
+      return false
+    }
+
+    const hasExistingAuthValue =
+      savedAuthType.value === 'API_KEY' && externalApi.value.authValueConfigured
+
+    if (!hasExistingAuthValue && !externalApi.value.authValue.trim()) {
+      alert('API Key 값을 입력해주세요.')
+      return false
+    }
+  }
+
+  if (externalApi.value.authType === 'BEARER') {
+    const hasExistingAuthValue =
+      savedAuthType.value === 'BEARER' && externalApi.value.authValueConfigured
+
+    if (!hasExistingAuthValue && !externalApi.value.authValue.trim()) {
+      alert('Bearer Token을 입력해주세요.')
+      return false
+    }
+  }
+
+  if (externalApi.value.authType === 'BASIC') {
+    if (!externalApi.value.authUsername.trim()) {
+      alert('Basic Auth Username을 입력해주세요.')
+      return false
+    }
+
+    const hasExistingPassword =
+      savedAuthType.value === 'BASIC' && externalApi.value.authPasswordConfigured
+
+    if (!hasExistingPassword && !externalApi.value.authPassword.trim()) {
+      alert('Basic Auth Password를 입력해주세요.')
+      return false
+    }
+  }
+
+  // 파라미터 입력값을 검증한다.
   for (let i = 0; i < params.value.length; i += 1) {
     const param = params.value[i]
 
@@ -157,10 +243,22 @@ const editExternalApi = async () => {
   }
 
   try {
-    // 1. 백엔드 수정 요청 형식으로 데이터를 구성한다.
+    // 1. 인증 방식에 따라 전송할 인증정보를 구분한다.
+    const authType = externalApi.value.authType
+
+    // 2. 백엔드 수정 요청 형식으로 데이터를 구성한다.
     const requestData = {
       externalApi: {
         ...externalApi.value,
+
+        authLocation: authType === 'API_KEY' ? externalApi.value.authLocation || null : null,
+        authKey: authType === 'API_KEY' ? externalApi.value.authKey || null : null,
+        authValue:
+          authType === 'API_KEY' || authType === 'BEARER'
+            ? externalApi.value.authValue || null
+            : null,
+        authUsername: authType === 'BASIC' ? externalApi.value.authUsername || null : null,
+        authPassword: authType === 'BASIC' ? externalApi.value.authPassword || null : null,
       },
       params: params.value.map((param) => ({
         ...param,
@@ -192,6 +290,7 @@ onMounted(() => {
     <div v-if="loading" class="text-gray-500">조회 중입니다.</div>
 
     <template v-else>
+      <!-- 기본 정보 -->
       <div class="bg-white border rounded p-4 mb-4">
         <h3 class="text-lg font-semibold mb-4">기본 정보</h3>
 
@@ -288,6 +387,112 @@ onMounted(() => {
         </div>
       </div>
 
+      <!-- 인증 정보 -->
+      <div class="bg-white border rounded p-4 mb-4">
+        <h3 class="text-lg font-semibold mb-4">인증 정보</h3>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium mb-1">인증 방식</label>
+            <select
+              v-model="externalApi.authType"
+              @change="changeAuthType"
+              class="w-full border rounded px-3 py-2"
+            >
+              <option value="NONE">인증 없음</option>
+              <option value="API_KEY">API Key</option>
+              <option value="BEARER">Bearer Token</option>
+              <option value="BASIC">Basic Auth</option>
+            </select>
+          </div>
+
+          <template v-if="externalApi.authType === 'API_KEY'">
+            <div>
+              <label class="block text-sm font-medium mb-1">전달 위치</label>
+              <select v-model="externalApi.authLocation" class="w-full border rounded px-3 py-2">
+                <option value="">선택</option>
+                <option value="HEADER">HEADER</option>
+                <option value="QUERY">QUERY</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium mb-1">Key 이름</label>
+              <input
+                v-model="externalApi.authKey"
+                type="text"
+                class="w-full border rounded px-3 py-2"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium mb-1">API Key</label>
+              <input
+                v-model="externalApi.authValue"
+                type="password"
+                placeholder="변경할 경우에만 입력"
+                class="w-full border rounded px-3 py-2"
+              />
+
+              <p
+                v-if="externalApi.authType === savedAuthType && externalApi.authValueConfigured"
+                class="mt-1 text-xs text-gray-500"
+              >
+                기존 API Key가 등록되어 있습니다. 변경할 경우에만 새 값을 입력하세요.
+              </p>
+            </div>
+          </template>
+
+          <template v-if="externalApi.authType === 'BEARER'">
+            <div class="col-span-2">
+              <label class="block text-sm font-medium mb-1">Bearer Token</label>
+              <input
+                v-model="externalApi.authValue"
+                type="password"
+                placeholder="변경할 경우에만 입력"
+                class="w-full border rounded px-3 py-2"
+              />
+
+              <p
+                v-if="savedAuthType === 'BEARER' && externalApi.authValueConfigured"
+                class="mt-1 text-xs text-gray-500"
+              >
+                기존 Bearer Token이 등록되어 있습니다. 변경할 경우에만 새 값을 입력하세요.
+              </p>
+            </div>
+          </template>
+
+          <template v-if="externalApi.authType === 'BASIC'">
+            <div>
+              <label class="block text-sm font-medium mb-1">Username</label>
+              <input
+                v-model="externalApi.authUsername"
+                type="text"
+                class="w-full border rounded px-3 py-2"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium mb-1">Password</label>
+              <input
+                v-model="externalApi.authPassword"
+                type="password"
+                placeholder="변경할 경우에만 입력"
+                class="w-full border rounded px-3 py-2"
+              />
+
+              <p
+                v-if="savedAuthType === 'BASIC' && externalApi.authPasswordConfigured"
+                class="mt-1 text-xs text-gray-500"
+              >
+                기존 Password가 등록되어 있습니다. 변경할 경우에만 새 값을 입력하세요.
+              </p>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- 파라미터 -->
       <div class="bg-white border rounded p-4">
         <div class="flex justify-between items-center mb-4">
           <h3 class="text-lg font-semibold">파라미터</h3>

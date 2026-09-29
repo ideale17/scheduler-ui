@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { createExternalApi } from '@/api/externalApi'
 
@@ -10,6 +10,14 @@ const externalApi = ref({
   apiUrl: '',
   httpMethod: 'GET',
   enabled: 'Y',
+
+  authType: 'NONE',
+  authLocation: '',
+  authKey: '',
+  authValue: '',
+  authUsername: '',
+  authPassword: '',
+
   retryEnabled: 'N',
   maxRetryCount: '',
   retryIntervalSec: '',
@@ -45,6 +53,7 @@ const removeParam = (index) => {
 }
 
 const validateForm = () => {
+  // 기본 정보 입력값을 검증한다.
   if (!externalApi.value.apiName.trim()) {
     alert('API 이름을 입력해주세요.')
     return false
@@ -67,6 +76,44 @@ const validateForm = () => {
     }
   }
 
+  // 인증 방식별 필수 입력값을 검증한다.
+  if (externalApi.value.authType === 'API_KEY') {
+    if (!externalApi.value.authLocation) {
+      alert('API Key 전달 위치를 선택해주세요.')
+      return false
+    }
+
+    if (!externalApi.value.authKey.trim()) {
+      alert('API Key 이름을 입력해주세요.')
+      return false
+    }
+
+    if (!externalApi.value.authValue.trim()) {
+      alert('API Key 값을 입력해주세요.')
+      return false
+    }
+  }
+
+  if (externalApi.value.authType === 'BEARER') {
+    if (!externalApi.value.authValue.trim()) {
+      alert('Bearer Token을 입력해주세요.')
+      return false
+    }
+  }
+
+  if (externalApi.value.authType === 'BASIC') {
+    if (!externalApi.value.authUsername.trim()) {
+      alert('Basic Auth Username을 입력해주세요.')
+      return false
+    }
+
+    if (!externalApi.value.authPassword.trim()) {
+      alert('Basic Auth Password를 입력해주세요.')
+      return false
+    }
+  }
+
+  // 파라미터 입력값을 검증한다.
   for (let i = 0; i < params.value.length; i += 1) {
     const param = params.value[i]
 
@@ -104,9 +151,21 @@ const addExternalApi = async () => {
   }
 
   try {
+    // 1. 현재 인증 방식을 조회한다.
+    const authType = externalApi.value.authType
+
+    // 2. 백엔드 등록 요청 형식으로 데이터를 구성한다.
     const requestData = {
       externalApi: {
         ...externalApi.value,
+        authLocation: authType === 'API_KEY' ? externalApi.value.authLocation || null : null,
+        authKey: authType === 'API_KEY' ? externalApi.value.authKey || null : null,
+        authValue:
+          authType === 'API_KEY' || authType === 'BEARER'
+            ? externalApi.value.authValue || null
+            : null,
+        authUsername: authType === 'BASIC' ? externalApi.value.authUsername || null : null,
+        authPassword: authType === 'BASIC' ? externalApi.value.authPassword || null : null,
       },
       params: params.value.map((param) => ({
         ...param,
@@ -116,8 +175,10 @@ const addExternalApi = async () => {
       })),
     }
 
+    // 3. External API 등록 API를 호출한다.
     await createExternalApi(requestData)
 
+    // 4. 등록 완료 후 목록 화면으로 이동한다.
     alert('External API 등록 성공')
     router.push('/externalApi')
   } catch (error) {
@@ -125,10 +186,23 @@ const addExternalApi = async () => {
     alert('External API 등록 실패')
   }
 }
+
+watch(
+  () => externalApi.value.authType,
+  () => {
+    // 1. 인증 방식이 변경되면 기존 인증 정보를 초기화한다.
+    externalApi.value.authLocation = ''
+    externalApi.value.authKey = ''
+    externalApi.value.authValue = ''
+    externalApi.value.authUsername = ''
+    externalApi.value.authPassword = ''
+  },
+)
 </script>
 
 <template>
   <div class="p-4">
+    <!-- 기본 정보 -->
     <div class="bg-white border rounded p-4 mb-4">
       <h3 class="text-lg font-semibold mb-4">기본 정보</h3>
 
@@ -213,6 +287,85 @@ const addExternalApi = async () => {
       </div>
     </div>
 
+    <!-- 인증 정보 -->
+    <div class="bg-white border rounded p-4 mb-4">
+      <h3 class="text-lg font-semibold mb-4">인증 정보</h3>
+
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium mb-1">인증 방식</label>
+          <select v-model="externalApi.authType" class="w-full border rounded px-3 py-2">
+            <option value="NONE">인증 없음</option>
+            <option value="API_KEY">API Key</option>
+            <option value="BEARER">Bearer Token</option>
+            <option value="BASIC">Basic Auth</option>
+          </select>
+        </div>
+
+        <template v-if="externalApi.authType === 'API_KEY'">
+          <div>
+            <label class="block text-sm font-medium mb-1">전달 위치</label>
+            <select v-model="externalApi.authLocation" class="w-full border rounded px-3 py-2">
+              <option value="">선택</option>
+              <option value="HEADER">HEADER</option>
+              <option value="QUERY">QUERY</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium mb-1">Key 이름</label>
+            <input
+              v-model="externalApi.authKey"
+              type="text"
+              placeholder="예: serviceKey"
+              class="w-full border rounded px-3 py-2"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium mb-1">API Key</label>
+            <input
+              v-model="externalApi.authValue"
+              type="password"
+              class="w-full border rounded px-3 py-2"
+            />
+          </div>
+        </template>
+
+        <template v-if="externalApi.authType === 'BEARER'">
+          <div class="col-span-2">
+            <label class="block text-sm font-medium mb-1">Bearer Token</label>
+            <input
+              v-model="externalApi.authValue"
+              type="password"
+              class="w-full border rounded px-3 py-2"
+            />
+          </div>
+        </template>
+
+        <template v-if="externalApi.authType === 'BASIC'">
+          <div>
+            <label class="block text-sm font-medium mb-1">Username</label>
+            <input
+              v-model="externalApi.authUsername"
+              type="text"
+              class="w-full border rounded px-3 py-2"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium mb-1">Password</label>
+            <input
+              v-model="externalApi.authPassword"
+              type="password"
+              class="w-full border rounded px-3 py-2"
+            />
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- 파라미터 -->
     <div class="bg-white border rounded p-4">
       <div class="flex justify-between items-center mb-4">
         <h3 class="text-lg font-semibold">파라미터</h3>

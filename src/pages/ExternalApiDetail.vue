@@ -110,6 +110,7 @@ onMounted(() => {
     <div v-if="loading" class="text-gray-500">조회 중입니다.</div>
 
     <template v-else-if="externalApi">
+      <!-- 기본 정보 -->
       <div class="bg-white border rounded p-4 mb-4">
         <div class="flex justify-between items-center mb-4">
           <h3 class="text-lg font-semibold">기본 정보</h3>
@@ -216,6 +217,68 @@ onMounted(() => {
         </div>
       </div>
 
+      <!-- 인증 정보 -->
+      <div class="bg-white border rounded p-4 mb-4">
+        <h3 class="text-lg font-semibold mb-4">인증 정보</h3>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <div class="text-sm text-gray-500">인증 방식</div>
+            <div class="mt-1">
+              {{ externalApi.authType || 'NONE' }}
+            </div>
+          </div>
+
+          <template v-if="externalApi.authType === 'API_KEY'">
+            <div>
+              <div class="text-sm text-gray-500">전달 위치</div>
+              <div class="mt-1">
+                {{ externalApi.authLocation || '-' }}
+              </div>
+            </div>
+
+            <div>
+              <div class="text-sm text-gray-500">Key 이름</div>
+              <div class="mt-1">
+                {{ externalApi.authKey || '-' }}
+              </div>
+            </div>
+
+            <div>
+              <div class="text-sm text-gray-500">API Key</div>
+              <div class="mt-1">********</div>
+            </div>
+          </template>
+
+          <template v-if="externalApi.authType === 'BEARER'">
+            <div>
+              <div class="text-sm text-gray-500">Bearer Token</div>
+              <div class="mt-1">********</div>
+            </div>
+          </template>
+
+          <template v-if="externalApi.authType === 'BASIC'">
+            <div>
+              <div class="text-sm text-gray-500">Username</div>
+              <div class="mt-1">
+                {{ externalApi.authUsername || '-' }}
+              </div>
+            </div>
+
+            <div>
+              <div class="text-sm text-gray-500">Password</div>
+              <div class="mt-1">********</div>
+            </div>
+          </template>
+
+          <div v-if="!externalApi.authType || externalApi.authType === 'NONE'">
+            <div class="text-sm text-gray-500">인증 정보</div>
+            <div class="mt-1">사용하지 않음</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 파라미터 -->
       <div class="bg-white border rounded p-4">
         <h3 class="text-lg font-semibold mb-4">파라미터</h3>
 
