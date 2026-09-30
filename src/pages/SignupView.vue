@@ -7,10 +7,17 @@ const router = useRouter()
 
 const username = ref('')
 const password = ref('')
+const passwordConfirm = ref('')
 const err = ref('')
 
 const signup = async () => {
   err.value = ''
+
+  // 1. 회원가입 입력값을 검증한다.
+  if (password.value !== passwordConfirm.value) {
+    err.value = '비밀번호가 일치하지 않습니다.'
+    return
+  }
 
   // 1. 회원가입 여부를 확인한다.
   const confirmed = confirm('회원가입하시겠습니까?')
@@ -20,7 +27,7 @@ const signup = async () => {
 
   try {
     // 2. 회원가입 API를 호출한다.
-    await signupUser(username.value, password.value)
+    await signupUser(username.value, password.value, passwordConfirm.value)
 
     // 3. 회원가입 성공 후 로그인 화면으로 이동한다.
     alert('회원가입이 완료되었습니다.')
@@ -39,6 +46,22 @@ const signup = async () => {
       <input v-model="username" placeholder="아이디" class="border p-2 w-full" />
 
       <input v-model="password" type="password" placeholder="비밀번호" class="border p-2 w-full" />
+
+      <input
+        v-model="passwordConfirm"
+        type="password"
+        placeholder="비밀번호 확인"
+        class="border p-2 w-full"
+      />
+
+      <p
+        v-if="passwordConfirm"
+        :class="['text-sm', password === passwordConfirm ? 'text-green-500' : 'text-red-500']"
+      >
+        {{
+          password === passwordConfirm ? '비밀번호가 일치합니다.' : '비밀번호가 일치하지 않습니다.'
+        }}
+      </p>
 
       <button type="submit" class="border p-2 w-full">회원가입</button>
 
