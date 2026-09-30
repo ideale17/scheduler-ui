@@ -1,7 +1,17 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getExternalApi, getExternalApiParams, updateExternalApi } from '@/api/externalApi'
+import {
+  getExternalApi,
+  getExternalApiPaging,
+  getExternalApiParams,
+  updateExternalApi,
+  updateExternalApiBasic,
+  updateExternalApiAuth,
+  updateExternalApiParams,
+  saveExternalApiPaging,
+  deleteExternalApiPaging,
+} from '@/api/externalApi'
 
 const route = useRoute()
 const router = useRouter()
@@ -27,6 +37,25 @@ const externalApi = ref({
   description: '',
 })
 
+const paging = ref({
+  enabled: 'Y',
+  paginationType: 'PAGE',
+  terminationType: 'TOTAL_COUNT',
+
+  pageParamLocation: 'QUERY',
+  pageParamName: '',
+  pageStart: 1,
+
+  sizeParamLocation: 'QUERY',
+  sizeParamName: '',
+  pageSize: '',
+
+  totalCountPath: '',
+  maxRequestCount: 100,
+})
+
+const pagingConfigured = ref(false)
+
 const params = ref([])
 const loading = ref(true)
 const savedAuthType = ref('NONE')
@@ -37,8 +66,9 @@ const fetchExternalApi = async () => {
     const externalApiId = route.params.externalApiId
 
     // 2. External API 기본정보와 파라미터를 조회한다.
-    const [externalApiResponse, paramsResponse] = await Promise.all([
+    const [externalApiResponse, pagingResponse, paramsResponse] = await Promise.all([
       getExternalApi(externalApiId),
+      getExternalApiPaging(externalApiId),
       getExternalApiParams(externalApiId),
     ])
 
@@ -78,7 +108,45 @@ const fetchExternalApi = async () => {
       description: externalApiResponse.data.description || '',
     }
 
-    // 4. 조회한 파라미터를 수정 화면에 설정한다.
+    // 4. 조회한 페이징 설정을 화면에 설정한다.
+    if (pagingResponse.data) {
+      pagingConfigured.value = true
+
+      paging.value = {
+        enabled: pagingResponse.data.enabled ?? 'Y',
+        paginationType: pagingResponse.data.paginationType ?? 'PAGE',
+        terminationType: pagingResponse.data.terminationType ?? 'TOTAL_COUNT',
+
+        pageParamLocation: pagingResponse.data.pageParamLocation ?? 'QUERY',
+        pageParamName: pagingResponse.data.pageParamName ?? '',
+        pageStart: pagingResponse.data.pageStart ?? 1,
+
+        sizeParamLocation: pagingResponse.data.sizeParamLocation ?? 'QUERY',
+        sizeParamName: pagingResponse.data.sizeParamName ?? '',
+        pageSize: pagingResponse.data.pageSize ?? '',
+
+        totalCountPath: pagingResponse.data.totalCountPath ?? '',
+        maxRequestCount: pagingResponse.data.maxRequestCount ?? 100,
+      }
+    } else {
+      pagingConfigured.value = false
+
+      paging.value = {
+        enabled: 'Y',
+        paginationType: 'PAGE',
+        terminationType: 'TOTAL_COUNT',
+        pageParamLocation: 'QUERY',
+        pageParamName: '',
+        pageStart: 1,
+        sizeParamLocation: 'QUERY',
+        sizeParamName: '',
+        pageSize: '',
+        totalCountPath: '',
+        maxRequestCount: 100,
+      }
+    }
+
+    // 5. 조회한 파라미터를 수정 화면에 설정한다.
     params.value = Array.isArray(paramsResponse.data)
       ? paramsResponse.data.map((param) => ({
           paramLocation: param.paramLocation,
@@ -228,6 +296,151 @@ const validateForm = () => {
   return true
 }
 
+const validateBasicInfo = () => {
+  // 1. API 이름을 검증한다.
+  if (!externalApi.value.apiName.trim()) {
+    alert('API 이름을 입력해주세요.')
+    return false
+  }
+
+  // 2. API URL을 검증한다.
+  if (!externalApi.value.apiUrl.trim()) {
+    alert('API URL을 입력해주세요.')
+    return false
+  }
+
+  // 3. 재시도 설정을 검증한다.
+  if (externalApi.value.retryEnabled === 'Y') {
+    if (!externalApi.value.maxRetryCount) {
+      alert('최대 재시도 횟수를 선택해주세요.')
+      return false
+    }
+
+    if (!externalApi.value.retryIntervalSec) {
+      alert('재시도 간격을 선택해주세요.')
+      return false
+    }
+  }
+
+  return true
+}
+
+const validateAuthInfo = () => {
+  // 1. API Key 인증 정보를 검증한다.
+  if (externalApi.value.authType === 'API_KEY') {
+    if (!externalApi.value.authLocation) {
+      alert('API Key 전달 위치를 선택해주세요.')
+      return false
+    }
+
+    if (!externalApi.value.authKey.trim()) {
+      alert('API Key 이름을 입력해주세요.')
+      return false
+    }
+
+    const hasExistingAuthValue =
+      savedAuthType.value === 'API_KEY' && externalApi.value.authValueConfigured
+
+    if (!hasExistingAuthValue && !externalApi.value.authValue.trim()) {
+      alert('API Key 값을 입력해주세요.')
+      return false
+    }
+  }
+
+  // 2. Bearer Token 인증 정보를 검증한다.
+  if (externalApi.value.authType === 'BEARER') {
+    const hasExistingAuthValue =
+      savedAuthType.value === 'BEARER' && externalApi.value.authValueConfigured
+
+    if (!hasExistingAuthValue && !externalApi.value.authValue.trim()) {
+      alert('Bearer Token을 입력해주세요.')
+      return false
+    }
+  }
+
+  // 3. Basic Auth 인증 정보를 검증한다.
+  if (externalApi.value.authType === 'BASIC') {
+    if (!externalApi.value.authUsername.trim()) {
+      alert('Basic Auth Username을 입력해주세요.')
+      return false
+    }
+
+    const hasExistingPassword =
+      savedAuthType.value === 'BASIC' && externalApi.value.authPasswordConfigured
+
+    if (!hasExistingPassword && !externalApi.value.authPassword.trim()) {
+      alert('Basic Auth Password를 입력해주세요.')
+      return false
+    }
+  }
+
+  return true
+}
+
+const validatePaging = () => {
+  // 1. 페이지 번호 파라미터명을 검증한다.
+  if (!paging.value.pageParamName.trim()) {
+    alert('페이지 번호 파라미터명을 입력해주세요.')
+    return false
+  }
+
+  // 2. 시작 페이지를 검증한다.
+  if (paging.value.pageStart === null || paging.value.pageStart < 0) {
+    alert('시작 페이지는 0 이상이어야 합니다.')
+    return false
+  }
+
+  // 3. 페이지 크기 파라미터명을 검증한다.
+  if (!paging.value.sizeParamName.trim()) {
+    alert('페이지 크기 파라미터명을 입력해주세요.')
+    return false
+  }
+
+  // 4. 페이지 크기를 검증한다.
+  if (!paging.value.pageSize || paging.value.pageSize <= 0) {
+    alert('페이지 크기는 1 이상이어야 합니다.')
+    return false
+  }
+
+  // 5. 전체 건수 경로를 검증한다.
+  if (!paging.value.totalCountPath.trim()) {
+    alert('전체 건수 경로를 입력해주세요.')
+    return false
+  }
+
+  // 6. 최대 요청 횟수를 검증한다.
+  if (!paging.value.maxRequestCount || paging.value.maxRequestCount <= 0) {
+    alert('최대 요청 횟수는 1 이상이어야 합니다.')
+    return false
+  }
+
+  return true
+}
+
+const validateParams = () => {
+  // 1. 파라미터 입력값을 검증한다.
+  for (let i = 0; i < params.value.length; i += 1) {
+    const param = params.value[i]
+
+    if (!param.paramName.trim()) {
+      alert(`${i + 1}번째 파라미터 이름을 입력해주세요.`)
+      return false
+    }
+
+    if (param.valueType === 'STATIC' && !param.paramValue.trim() && param.requiredYn === 'Y') {
+      alert(`${param.paramName}의 값을 입력해주세요.`)
+      return false
+    }
+
+    if (param.valueType !== 'STATIC' && !param.valueFormat.trim()) {
+      alert(`${param.paramName}의 포맷을 입력해주세요.`)
+      return false
+    }
+  }
+
+  return true
+}
+
 const editExternalApi = async () => {
   if (!validateForm()) {
     return
@@ -277,6 +490,181 @@ const editExternalApi = async () => {
   } catch (error) {
     console.error('External API 수정 실패:', error)
     alert('External API 수정 실패')
+  }
+}
+
+const saveBasicInfo = async () => {
+  // 1. 기본 정보 입력값을 검증한다.
+  if (!validateBasicInfo()) {
+    return
+  }
+
+  // 2. 수정 여부를 확인한다.
+  if (!confirm('기본 정보를 수정하시겠습니까?')) {
+    return
+  }
+
+  try {
+    // 3. 재시도를 사용하지 않으면 관련 값을 0으로 설정한다.
+    const retryEnabled = externalApi.value.retryEnabled
+
+    // 4. 기본 정보 수정 요청 데이터를 구성한다.
+    const basic = {
+      apiName: externalApi.value.apiName,
+      apiUrl: externalApi.value.apiUrl,
+      httpMethod: externalApi.value.httpMethod,
+      enabled: externalApi.value.enabled,
+
+      retryEnabled,
+      maxRetryCount: retryEnabled === 'Y' ? externalApi.value.maxRetryCount : 0,
+      retryIntervalSec: retryEnabled === 'Y' ? externalApi.value.retryIntervalSec : 0,
+
+      description: externalApi.value.description || null,
+    }
+
+    // 5. External API 기본 정보를 수정한다.
+    await updateExternalApiBasic(route.params.externalApiId, basic)
+
+    // 6. 수정된 정보를 다시 조회한다.
+    await fetchExternalApi()
+
+    // 7. 수정 성공 결과를 표시한다.
+    alert('External API 기본 정보 수정 성공')
+  } catch (error) {
+    console.error('External API 기본 정보 수정 실패:', error)
+    alert('External API 기본 정보 수정 실패')
+  }
+}
+
+const saveAuthInfo = async () => {
+  // 1. 인증 정보 입력값을 검증한다.
+  if (!validateAuthInfo()) {
+    return
+  }
+
+  // 2. 수정 여부를 확인한다.
+  if (!confirm('인증 정보를 수정하시겠습니까?')) {
+    return
+  }
+
+  try {
+    // 3. 현재 인증 방식을 확인한다.
+    const authType = externalApi.value.authType
+
+    // 4. 인증 방식에 따라 수정 요청 데이터를 구성한다.
+    const auth = {
+      authType,
+      authLocation: authType === 'API_KEY' ? externalApi.value.authLocation || null : null,
+      authKey: authType === 'API_KEY' ? externalApi.value.authKey || null : null,
+      authValue:
+        authType === 'API_KEY' || authType === 'BEARER'
+          ? externalApi.value.authValue || null
+          : null,
+      authUsername: authType === 'BASIC' ? externalApi.value.authUsername || null : null,
+      authPassword: authType === 'BASIC' ? externalApi.value.authPassword || null : null,
+    }
+
+    // 5. External API 인증 정보를 수정한다.
+    await updateExternalApiAuth(route.params.externalApiId, auth)
+
+    // 6. 수정된 정보를 다시 조회한다.
+    await fetchExternalApi()
+
+    // 7. 수정 성공 결과를 표시한다.
+    alert('External API 인증 정보 수정 성공')
+  } catch (error) {
+    console.error('External API 인증 정보 수정 실패:', error)
+    alert('External API 인증 정보 수정 실패')
+  }
+}
+
+const savePaging = async () => {
+  // 1. 페이징 설정을 검증한다.
+  if (!validatePaging()) {
+    return
+  }
+
+  // 2. 저장 여부를 확인한다.
+  if (!confirm('페이징 설정을 저장하시겠습니까?')) {
+    return
+  }
+
+  try {
+    // 3. External API 페이징 설정을 저장한다.
+    await saveExternalApiPaging(route.params.externalApiId, paging.value)
+
+    // 4. 페이징 설정 상태를 갱신한다.
+    pagingConfigured.value = true
+
+    // 5. 수정된 정보를 다시 조회한다.
+    await fetchExternalApi()
+
+    // 6. 저장 성공 결과를 표시한다.
+    alert('External API 페이징 설정 저장 성공')
+  } catch (error) {
+    console.error('External API 페이징 설정 저장 실패:', error)
+    alert('External API 페이징 설정 저장 실패')
+  }
+}
+
+const saveParams = async () => {
+  // 1. 파라미터 입력값을 검증한다.
+  if (!validateParams()) {
+    return
+  }
+
+  // 2. 수정 여부를 확인한다.
+  if (!confirm('파라미터 정보를 수정하시겠습니까?')) {
+    return
+  }
+
+  try {
+    // 3. 백엔드 수정 요청 형식으로 파라미터를 구성한다.
+    const requestParams = params.value.map((param) => ({
+      ...param,
+      paramValue: param.valueType === 'STATIC' ? param.paramValue || null : null,
+      valueFormat: param.valueType === 'STATIC' ? null : param.valueFormat || null,
+      description: param.description || null,
+    }))
+
+    // 4. External API 파라미터를 수정한다.
+    await updateExternalApiParams(route.params.externalApiId, requestParams)
+
+    // 5. 수정된 정보를 다시 조회한다.
+    await fetchExternalApi()
+
+    // 6. 수정 성공 결과를 표시한다.
+    alert('External API 파라미터 수정 성공')
+  } catch (error) {
+    console.error('External API 파라미터 수정 실패:', error)
+    alert('External API 파라미터 수정 실패')
+  }
+}
+
+const removePaging = async () => {
+  // 1. 등록된 페이징 설정이 없으면 종료한다.
+  if (!pagingConfigured.value) {
+    alert('삭제할 페이징 설정이 없습니다.')
+    return
+  }
+
+  // 2. 삭제 여부를 확인한다.
+  if (!confirm('페이징 설정을 삭제하시겠습니까?')) {
+    return
+  }
+
+  try {
+    // 3. External API 페이징 설정을 삭제한다.
+    await deleteExternalApiPaging(route.params.externalApiId)
+
+    // 4. 수정된 정보를 다시 조회한다.
+    await fetchExternalApi()
+
+    // 5. 삭제 성공 결과를 표시한다.
+    alert('External API 페이징 설정 삭제 성공')
+  } catch (error) {
+    console.error('External API 페이징 설정 삭제 실패:', error)
+    alert('External API 페이징 설정 삭제 실패')
   }
 }
 
@@ -375,15 +763,15 @@ onMounted(() => {
               class="w-full border rounded px-3 py-2"
             />
           </div>
-
-          <div>
-            <label class="block text-sm font-medium mb-1">설명</label>
-            <input
-              v-model="externalApi.description"
-              type="text"
-              class="w-full border rounded px-3 py-2"
-            />
-          </div>
+        </div>
+        <div class="flex justify-end mt-4">
+          <button
+            type="button"
+            class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            @click="saveBasicInfo"
+          >
+            기본 정보 저장
+          </button>
         </div>
       </div>
 
@@ -490,6 +878,146 @@ onMounted(() => {
             </div>
           </template>
         </div>
+        <div class="flex justify-end mt-4">
+          <button
+            type="button"
+            class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            @click="saveAuthInfo"
+          >
+            인증 정보 저장
+          </button>
+        </div>
+      </div>
+
+      <!-- 페이징 설정 -->
+      <div class="bg-white border rounded p-4 mb-4">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-semibold">페이징 설정</h3>
+
+          <span class="text-sm" :class="pagingConfigured ? 'text-green-600' : 'text-gray-500'">
+            {{ pagingConfigured ? '설정됨' : '미설정' }}
+          </span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium mb-1"> 페이징 방식 </label>
+
+            <select v-model="paging.paginationType" class="w-full border rounded px-3 py-2">
+              <option value="PAGE">PAGE</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium mb-1"> 종료 조건 </label>
+
+            <select v-model="paging.terminationType" class="w-full border rounded px-3 py-2">
+              <option value="TOTAL_COUNT">TOTAL_COUNT</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium mb-1"> 페이지 번호 전달 위치 </label>
+
+            <select v-model="paging.pageParamLocation" class="w-full border rounded px-3 py-2">
+              <option value="QUERY">QUERY</option>
+              <option value="BODY">BODY</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium mb-1"> 페이지 번호 파라미터명 </label>
+
+            <input
+              v-model="paging.pageParamName"
+              type="text"
+              placeholder="예: pageNo"
+              class="w-full border rounded px-3 py-2"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium mb-1"> 시작 페이지 </label>
+
+            <input
+              v-model.number="paging.pageStart"
+              type="number"
+              min="0"
+              class="w-full border rounded px-3 py-2"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium mb-1"> 페이지 크기 전달 위치 </label>
+
+            <select v-model="paging.sizeParamLocation" class="w-full border rounded px-3 py-2">
+              <option value="QUERY">QUERY</option>
+              <option value="BODY">BODY</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium mb-1"> 페이지 크기 파라미터명 </label>
+
+            <input
+              v-model="paging.sizeParamName"
+              type="text"
+              placeholder="예: numOfRows"
+              class="w-full border rounded px-3 py-2"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium mb-1"> 페이지 크기 </label>
+
+            <input
+              v-model.number="paging.pageSize"
+              type="number"
+              min="1"
+              class="w-full border rounded px-3 py-2"
+            />
+          </div>
+
+          <div class="col-span-2">
+            <label class="block text-sm font-medium mb-1"> 전체 건수 경로 </label>
+
+            <input
+              v-model="paging.totalCountPath"
+              type="text"
+              placeholder="예: response.body.totalCount"
+              class="w-full border rounded px-3 py-2"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium mb-1"> 최대 요청 횟수 </label>
+
+            <input
+              v-model.number="paging.maxRequestCount"
+              type="number"
+              min="1"
+              class="w-full border rounded px-3 py-2"
+            />
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 mt-4">
+          <button
+            v-if="pagingConfigured"
+            type="button"
+            class="px-4 py-2 border border-red-500 text-red-600 rounded hover:bg-red-50"
+            @click="removePaging"
+          >
+            페이징 설정 삭제
+          </button>
+
+          <button
+            type="button"
+            class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            @click="savePaging"
+          >
+            페이징 설정 저장
+          </button>
+        </div>
       </div>
 
       <!-- 파라미터 -->
@@ -595,23 +1123,32 @@ onMounted(() => {
             </button>
           </div>
         </div>
+        <div class="flex justify-end mt-4">
+          <button
+            type="button"
+            class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            @click="saveParams"
+          >
+            파라미터 저장
+          </button>
+        </div>
       </div>
 
       <div class="flex justify-end gap-2 mt-4">
         <button
           type="button"
-          @click="router.push(`/externalApi/${route.params.externalApiId}`)"
+          @click="router.push('/externalApi')"
           class="bg-gray-300 px-4 py-2 rounded"
         >
-          취소
+          목록
         </button>
 
         <button
           type="button"
-          @click="editExternalApi"
-          class="bg-blue-500 text-white px-4 py-2 rounded"
+          @click="router.push(`/externalApi/${route.params.externalApiId}`)"
+          class="bg-gray-700 text-white px-4 py-2 rounded"
         >
-          수정
+          상세
         </button>
       </div>
     </template>

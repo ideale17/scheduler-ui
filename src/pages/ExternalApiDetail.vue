@@ -5,6 +5,7 @@ import {
   deleteExternalApi,
   executeExternalApi,
   getExternalApi,
+  getExternalApiPaging,
   getExternalApiParams,
 } from '@/api/externalApi'
 
@@ -12,6 +13,7 @@ const route = useRoute()
 const router = useRouter()
 
 const externalApi = ref(null)
+const paging = ref(null)
 const params = ref([])
 const loading = ref(true)
 
@@ -21,14 +23,15 @@ const fetchExternalApiDetail = async () => {
     const externalApiId = route.params.externalApiId
 
     // 2. External API 기본정보와 파라미터를 조회한다.
-    const [externalApiResponse, paramsResponse] = await Promise.all([
+    const [externalApiResponse, pagingResponse, paramsResponse] = await Promise.all([
       getExternalApi(externalApiId),
+      getExternalApiPaging(externalApiId),
       getExternalApiParams(externalApiId),
     ])
 
     // 3. 조회 결과를 화면 상태에 저장한다.
     externalApi.value = externalApiResponse.data
-
+    paging.value = pagingResponse.data || null
     params.value = Array.isArray(paramsResponse.data) ? paramsResponse.data : []
   } catch (error) {
     console.error('External API 상세 조회 실패:', error)
@@ -276,6 +279,92 @@ onMounted(() => {
             <div class="mt-1">사용하지 않음</div>
           </div>
         </div>
+      </div>
+
+      <!-- 페이징 설정 -->
+      <div class="bg-white border rounded p-4 mb-4">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-semibold">페이징 설정</h3>
+
+          <span
+            class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
+            :class="paging ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
+          >
+            {{ paging ? '설정됨' : '미설정' }}
+          </span>
+        </div>
+
+        <div v-if="paging" class="grid grid-cols-2 gap-4">
+          <div>
+            <div class="text-sm text-gray-500">페이징 방식</div>
+            <div class="mt-1">
+              {{ paging.paginationType }}
+            </div>
+          </div>
+
+          <div>
+            <div class="text-sm text-gray-500">종료 조건</div>
+            <div class="mt-1">
+              {{ paging.terminationType }}
+            </div>
+          </div>
+
+          <div>
+            <div class="text-sm text-gray-500">페이지 번호 전달 위치</div>
+            <div class="mt-1">
+              {{ paging.pageParamLocation }}
+            </div>
+          </div>
+
+          <div>
+            <div class="text-sm text-gray-500">페이지 번호 파라미터명</div>
+            <div class="mt-1">
+              {{ paging.pageParamName }}
+            </div>
+          </div>
+
+          <div>
+            <div class="text-sm text-gray-500">시작 페이지</div>
+            <div class="mt-1">
+              {{ paging.pageStart }}
+            </div>
+          </div>
+
+          <div>
+            <div class="text-sm text-gray-500">페이지 크기 전달 위치</div>
+            <div class="mt-1">
+              {{ paging.sizeParamLocation }}
+            </div>
+          </div>
+
+          <div>
+            <div class="text-sm text-gray-500">페이지 크기 파라미터명</div>
+            <div class="mt-1">
+              {{ paging.sizeParamName }}
+            </div>
+          </div>
+
+          <div>
+            <div class="text-sm text-gray-500">페이지 크기</div>
+            <div class="mt-1">
+              {{ paging.pageSize }}
+            </div>
+          </div>
+
+          <div class="col-span-2">
+            <div class="text-sm text-gray-500">전체 건수 경로</div>
+            <div class="mt-1">
+              {{ paging.totalCountPath }}
+            </div>
+          </div>
+
+          <div>
+            <div class="text-sm text-gray-500">최대 요청 횟수</div>
+            <div class="mt-1">{{ paging.maxRequestCount }}회</div>
+          </div>
+        </div>
+
+        <div v-else class="text-gray-500">등록된 페이징 설정이 없습니다.</div>
       </div>
 
       <!-- 파라미터 -->
