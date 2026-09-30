@@ -8,7 +8,7 @@ import AddJobForm from '@/pages/AddJobForm.vue'
 import EditJob from '@/pages/EditJob.vue'
 import JobHistory from '@/pages/JobHistory.vue'
 import SchedulerInfoView from '@/pages/SchedulerInfoView.vue'
-import { getCurrentUser } from '@/api/authApi'
+import { getCurrentUser, getSignupEnabled } from '@/api/authApi'
 import ExternalApiList from '@/pages/ExternalApiList.vue'
 import ExternalApiAdd from '@/pages/ExternalApiAdd.vue'
 import ExternalApiDetail from '@/pages/ExternalApiDetail.vue'
@@ -98,6 +98,19 @@ const router = createRouter({
 // 중첩 라우트 대응 가드
 router.beforeEach(async (to, from, next) => {
   const needsAuth = to.matched.some((r) => r.meta?.requiresAuth)
+
+  // 1. 회원가입 화면 접근 가능 여부를 확인한다.
+  if (to.path === '/signup') {
+    try {
+      const { data } = await getSignupEnabled()
+
+      if (!data?.signupEnabled) {
+        return next('/login')
+      }
+    } catch {
+      return next('/login')
+    }
+  }
 
   if (!needsAuth) {
     // 로그인 페이지에 이미 로그인 상태로 들어오면 홈으로

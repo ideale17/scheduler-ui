@@ -1,6 +1,6 @@
 <script setup>
-import { ref } from 'vue'
-import { loginUser } from '@/api/authApi'
+import { onMounted, ref } from 'vue'
+import { getSignupEnabled, loginUser } from '@/api/authApi'
 import { useRouter, useRoute } from 'vue-router'
 
 const router = useRouter()
@@ -8,6 +8,7 @@ const route = useRoute()
 const username = ref('')
 const password = ref('')
 const err = ref('')
+const signupEnabled = ref(false)
 
 const login = async () => {
   err.value = ''
@@ -22,6 +23,16 @@ const login = async () => {
     err.value = '로그인 실패'
   }
 }
+
+onMounted(async () => {
+  try {
+    // 1. 회원가입 활성화 여부를 조회한다.
+    const response = await getSignupEnabled()
+    signupEnabled.value = response.data.signupEnabled
+  } catch {
+    signupEnabled.value = false
+  }
+})
 </script>
 
 <template>
@@ -35,7 +46,12 @@ const login = async () => {
 
       <button type="submit" class="border p-2 w-full">로그인</button>
 
-      <button type="button" class="border p-2 w-full" @click="router.push('/signup')">
+      <button
+        v-if="signupEnabled"
+        type="button"
+        class="border p-2 w-full"
+        @click="router.push('/signup')"
+      >
         회원가입
       </button>
 

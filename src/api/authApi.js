@@ -22,3 +22,7 @@ export const signupUser = (username, password, passwordConfirm) => {
     passwordConfirm,
   })
 }
+
+export const getSignupEnabled = () => {
+  return http.get('/auth/signup-enabled')
+}
