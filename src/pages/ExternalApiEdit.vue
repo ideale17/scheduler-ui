@@ -12,9 +12,82 @@ import {
   saveExternalApiPaging,
   deleteExternalApiPaging,
 } from '@/api/externalApi'
+import { moveToField, setFieldError } from '@/utils/formValidation'
 
 const route = useRoute()
 const router = useRouter()
+
+const apiNameInput = ref(null)
+const apiUrlInput = ref(null)
+const maxRetryCountInput = ref(null)
+const retryIntervalSecInput = ref(null)
+
+const authLocationInput = ref(null)
+const authKeyInput = ref(null)
+const authValueInput = ref(null)
+const authUsernameInput = ref(null)
+const authPasswordInput = ref(null)
+
+const pageParamNameInput = ref(null)
+const pageStartInput = ref(null)
+const sizeParamNameInput = ref(null)
+const pageSizeInput = ref(null)
+const totalCountPathInput = ref(null)
+const maxRequestCountInput = ref(null)
+
+const paramNameInputs = ref([])
+const paramValueInputs = ref([])
+const paramFormatInputs = ref([])
+
+const errors = ref({
+  apiName: '',
+  apiUrl: '',
+  maxRetryCount: '',
+  retryIntervalSec: '',
+
+  authLocation: '',
+  authKey: '',
+  authValue: '',
+  authUsername: '',
+  authPassword: '',
+
+  pageParamName: '',
+  pageStart: '',
+  sizeParamName: '',
+  pageSize: '',
+  totalCountPath: '',
+  maxRequestCount: '',
+
+  params: [],
+})
+
+const clearBasicErrors = () => {
+  errors.value.apiName = ''
+  errors.value.apiUrl = ''
+  errors.value.maxRetryCount = ''
+  errors.value.retryIntervalSec = ''
+}
+
+const clearAuthErrors = () => {
+  errors.value.authLocation = ''
+  errors.value.authKey = ''
+  errors.value.authValue = ''
+  errors.value.authUsername = ''
+  errors.value.authPassword = ''
+}
+
+const clearPagingErrors = () => {
+  errors.value.pageParamName = ''
+  errors.value.pageStart = ''
+  errors.value.sizeParamName = ''
+  errors.value.pageSize = ''
+  errors.value.totalCountPath = ''
+  errors.value.maxRequestCount = ''
+}
+
+const clearParamErrors = () => {
+  errors.value.params = []
+}
 
 const externalApi = ref({
   apiName: '',
@@ -188,6 +261,9 @@ const changeAuthType = () => {
   externalApi.value.authValue = ''
   externalApi.value.authUsername = ''
   externalApi.value.authPassword = ''
+
+  // 2. 기존 인증 검증 오류를 초기화한다.
+  clearAuthErrors()
 }
 
 const addParam = () => {
@@ -297,28 +373,37 @@ const validateForm = () => {
 }
 
 const validateBasicInfo = () => {
-  // 1. API 이름을 검증한다.
+  // 1. 기존 기본 정보 검증 오류를 초기화한다.
+  clearBasicErrors()
+
+  // 2. API 이름을 검증한다.
   if (!externalApi.value.apiName.trim()) {
-    alert('API 이름을 입력해주세요.')
-    return false
+    return setFieldError(errors, 'apiName', 'API 이름을 입력해주세요.', apiNameInput.value)
   }
 
-  // 2. API URL을 검증한다.
+  // 3. API URL을 검증한다.
   if (!externalApi.value.apiUrl.trim()) {
-    alert('API URL을 입력해주세요.')
-    return false
+    return setFieldError(errors, 'apiUrl', 'API URL을 입력해주세요.', apiUrlInput.value)
   }
 
-  // 3. 재시도 설정을 검증한다.
+  // 4. 재시도 설정을 검증한다.
   if (externalApi.value.retryEnabled === 'Y') {
     if (!externalApi.value.maxRetryCount) {
-      alert('최대 재시도 횟수를 선택해주세요.')
-      return false
+      return setFieldError(
+        errors,
+        'maxRetryCount',
+        '최대 재시도 횟수를 선택해주세요.',
+        maxRetryCountInput.value,
+      )
     }
 
     if (!externalApi.value.retryIntervalSec) {
-      alert('재시도 간격을 선택해주세요.')
-      return false
+      return setFieldError(
+        errors,
+        'retryIntervalSec',
+        '재시도 간격을 선택해주세요.',
+        retryIntervalSecInput.value,
+      )
     }
   }
 
@@ -326,51 +411,68 @@ const validateBasicInfo = () => {
 }
 
 const validateAuthInfo = () => {
-  // 1. API Key 인증 정보를 검증한다.
+  // 1. 기존 인증 정보 검증 오류를 초기화한다.
+  clearAuthErrors()
+
+  // 2. API Key 인증 정보를 검증한다.
   if (externalApi.value.authType === 'API_KEY') {
     if (!externalApi.value.authLocation) {
-      alert('API Key 전달 위치를 선택해주세요.')
-      return false
+      return setFieldError(
+        errors,
+        'authLocation',
+        'API Key 전달 위치를 선택해주세요.',
+        authLocationInput.value,
+      )
     }
 
     if (!externalApi.value.authKey.trim()) {
-      alert('API Key 이름을 입력해주세요.')
-      return false
+      return setFieldError(errors, 'authKey', 'API Key 이름을 입력해주세요.', authKeyInput.value)
     }
 
     const hasExistingAuthValue =
       savedAuthType.value === 'API_KEY' && externalApi.value.authValueConfigured
 
     if (!hasExistingAuthValue && !externalApi.value.authValue.trim()) {
-      alert('API Key 값을 입력해주세요.')
-      return false
+      return setFieldError(errors, 'authValue', 'API Key 값을 입력해주세요.', authValueInput.value)
     }
   }
 
-  // 2. Bearer Token 인증 정보를 검증한다.
+  // 3. Bearer Token 인증 정보를 검증한다.
   if (externalApi.value.authType === 'BEARER') {
     const hasExistingAuthValue =
       savedAuthType.value === 'BEARER' && externalApi.value.authValueConfigured
 
     if (!hasExistingAuthValue && !externalApi.value.authValue.trim()) {
-      alert('Bearer Token을 입력해주세요.')
-      return false
+      return setFieldError(
+        errors,
+        'authValue',
+        'Bearer Token을 입력해주세요.',
+        authValueInput.value,
+      )
     }
   }
 
-  // 3. Basic Auth 인증 정보를 검증한다.
+  // 4. Basic Auth 인증 정보를 검증한다.
   if (externalApi.value.authType === 'BASIC') {
     if (!externalApi.value.authUsername.trim()) {
-      alert('Basic Auth Username을 입력해주세요.')
-      return false
+      return setFieldError(
+        errors,
+        'authUsername',
+        'Basic Auth Username을 입력해주세요.',
+        authUsernameInput.value,
+      )
     }
 
     const hasExistingPassword =
       savedAuthType.value === 'BASIC' && externalApi.value.authPasswordConfigured
 
     if (!hasExistingPassword && !externalApi.value.authPassword.trim()) {
-      alert('Basic Auth Password를 입력해주세요.')
-      return false
+      return setFieldError(
+        errors,
+        'authPassword',
+        'Basic Auth Password를 입력해주세요.',
+        authPasswordInput.value,
+      )
     }
   }
 
@@ -378,119 +480,106 @@ const validateAuthInfo = () => {
 }
 
 const validatePaging = () => {
-  // 1. 페이지 번호 파라미터명을 검증한다.
+  // 1. 기존 페이징 검증 오류를 초기화한다.
+  clearPagingErrors()
+
+  // 2. 페이지 번호 파라미터명을 검증한다.
   if (!paging.value.pageParamName.trim()) {
-    alert('페이지 번호 파라미터명을 입력해주세요.')
-    return false
+    return setFieldError(
+      errors,
+      'pageParamName',
+      '페이지 번호 파라미터명을 입력해주세요.',
+      pageParamNameInput.value,
+    )
   }
 
-  // 2. 시작 페이지를 검증한다.
+  // 3. 시작 페이지를 검증한다.
   if (paging.value.pageStart === null || paging.value.pageStart < 0) {
-    alert('시작 페이지는 0 이상이어야 합니다.')
-    return false
+    return setFieldError(
+      errors,
+      'pageStart',
+      '시작 페이지는 0 이상이어야 합니다.',
+      pageStartInput.value,
+    )
   }
 
-  // 3. 페이지 크기 파라미터명을 검증한다.
+  // 4. 페이지 크기 파라미터명을 검증한다.
   if (!paging.value.sizeParamName.trim()) {
-    alert('페이지 크기 파라미터명을 입력해주세요.')
-    return false
+    return setFieldError(
+      errors,
+      'sizeParamName',
+      '페이지 크기 파라미터명을 입력해주세요.',
+      sizeParamNameInput.value,
+    )
   }
 
-  // 4. 페이지 크기를 검증한다.
+  // 5. 페이지당 조회 건수를 검증한다.
   if (!paging.value.pageSize || paging.value.pageSize <= 0) {
-    alert('페이지 크기는 1 이상이어야 합니다.')
-    return false
+    return setFieldError(
+      errors,
+      'pageSize',
+      '페이지당 조회 건수는 1 이상이어야 합니다.',
+      pageSizeInput.value,
+    )
   }
 
-  // 5. 전체 건수 경로를 검증한다.
+  // 6. 전체 건수 경로를 검증한다.
   if (!paging.value.totalCountPath.trim()) {
-    alert('전체 건수 경로를 입력해주세요.')
-    return false
+    return setFieldError(
+      errors,
+      'totalCountPath',
+      '전체 건수 경로를 입력해주세요.',
+      totalCountPathInput.value,
+    )
   }
 
-  // 6. 최대 요청 횟수를 검증한다.
+  // 7. 최대 요청 횟수를 검증한다.
   if (!paging.value.maxRequestCount || paging.value.maxRequestCount <= 0) {
-    alert('최대 요청 횟수는 1 이상이어야 합니다.')
-    return false
+    return setFieldError(
+      errors,
+      'maxRequestCount',
+      '최대 요청 횟수는 1 이상이어야 합니다.',
+      maxRequestCountInput.value,
+    )
   }
 
   return true
 }
 
 const validateParams = () => {
-  // 1. 파라미터 입력값을 검증한다.
+  // 1. 기존 파라미터 검증 오류를 초기화한다.
+  clearParamErrors()
+
+  // 2. 파라미터 입력값을 검증한다.
   for (let i = 0; i < params.value.length; i += 1) {
     const param = params.value[i]
 
+    errors.value.params[i] = {
+      paramName: '',
+      paramValue: '',
+      valueFormat: '',
+    }
+
     if (!param.paramName.trim()) {
-      alert(`${i + 1}번째 파라미터 이름을 입력해주세요.`)
+      errors.value.params[i].paramName = '파라미터 이름을 입력해주세요.'
+      moveToField(paramNameInputs.value[i])
       return false
     }
 
     if (param.valueType === 'STATIC' && !param.paramValue.trim() && param.requiredYn === 'Y') {
-      alert(`${param.paramName}의 값을 입력해주세요.`)
+      errors.value.params[i].paramValue = '필수 파라미터 값을 입력해주세요.'
+      moveToField(paramValueInputs.value[i])
       return false
     }
 
     if (param.valueType !== 'STATIC' && !param.valueFormat.trim()) {
-      alert(`${param.paramName}의 포맷을 입력해주세요.`)
+      errors.value.params[i].valueFormat = '포맷을 입력해주세요.'
+      moveToField(paramFormatInputs.value[i])
       return false
     }
   }
 
   return true
-}
-
-const editExternalApi = async () => {
-  if (!validateForm()) {
-    return
-  }
-
-  if (!confirm('External API를 수정하시겠습니까?')) {
-    return
-  }
-
-  if (externalApi.value.retryEnabled === 'N') {
-    externalApi.value.maxRetryCount = 0
-    externalApi.value.retryIntervalSec = 0
-  }
-
-  try {
-    // 1. 인증 방식에 따라 전송할 인증정보를 구분한다.
-    const authType = externalApi.value.authType
-
-    // 2. 백엔드 수정 요청 형식으로 데이터를 구성한다.
-    const requestData = {
-      externalApi: {
-        ...externalApi.value,
-
-        authLocation: authType === 'API_KEY' ? externalApi.value.authLocation || null : null,
-        authKey: authType === 'API_KEY' ? externalApi.value.authKey || null : null,
-        authValue:
-          authType === 'API_KEY' || authType === 'BEARER'
-            ? externalApi.value.authValue || null
-            : null,
-        authUsername: authType === 'BASIC' ? externalApi.value.authUsername || null : null,
-        authPassword: authType === 'BASIC' ? externalApi.value.authPassword || null : null,
-      },
-      params: params.value.map((param) => ({
-        ...param,
-        paramValue: param.valueType === 'STATIC' ? param.paramValue || null : null,
-        valueFormat: param.valueType === 'STATIC' ? null : param.valueFormat || null,
-        description: param.description || null,
-      })),
-    }
-
-    // 2. External API 수정 API를 호출한다.
-    await updateExternalApi(route.params.externalApiId, requestData)
-
-    // 3. 수정 완료 후 상세 화면으로 이동한다.
-    alert('External API 수정 성공')
-    router.push(`/externalApi/${route.params.externalApiId}`)
-  } catch (error) {
-    console.error('External API 수정 실패:', error)
-    alert('External API 수정 실패')
-  }
 }
 
 const saveBasicInfo = async () => {
@@ -684,12 +773,22 @@ onMounted(() => {
 
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm font-medium mb-1">API 이름</label>
+            <label class="block text-sm font-medium mb-1">
+              API 이름
+              <span class="text-red-500">*</span>
+            </label>
+
             <input
+              ref="apiNameInput"
               v-model="externalApi.apiName"
               type="text"
+              @input="errors.apiName = ''"
               class="w-full border rounded px-3 py-2"
             />
+
+            <p v-if="errors.apiName" class="mt-1 text-sm text-red-500">
+              {{ errors.apiName }}
+            </p>
           </div>
 
           <div>
@@ -704,12 +803,22 @@ onMounted(() => {
           </div>
 
           <div class="col-span-2">
-            <label class="block text-sm font-medium mb-1">API URL</label>
+            <label class="block text-sm font-medium mb-1">
+              API URL
+              <span class="text-red-500">*</span>
+            </label>
+
             <input
+              ref="apiUrlInput"
               v-model="externalApi.apiUrl"
               type="text"
+              @input="errors.apiUrl = ''"
               class="w-full border rounded px-3 py-2"
             />
+
+            <p v-if="errors.apiUrl" class="mt-1 text-sm text-red-500">
+              {{ errors.apiUrl }}
+            </p>
           </div>
 
           <div>
@@ -728,9 +837,15 @@ onMounted(() => {
           </div>
 
           <div v-if="externalApi.retryEnabled === 'Y'">
-            <label class="block text-sm font-medium mb-1">최대 재시도 횟수</label>
+            <label class="block text-sm font-medium mb-1">
+              최대 재시도 횟수
+              <span class="text-red-500">*</span>
+            </label>
+
             <select
+              ref="maxRetryCountInput"
               v-model.number="externalApi.maxRetryCount"
+              @change="errors.maxRetryCount = ''"
               class="w-full border rounded px-3 py-2"
             >
               <option value="">선택</option>
@@ -739,12 +854,22 @@ onMounted(() => {
               <option :value="3">3회</option>
               <option :value="5">5회</option>
             </select>
+
+            <p v-if="errors.maxRetryCount" class="mt-1 text-sm text-red-500">
+              {{ errors.maxRetryCount }}
+            </p>
           </div>
 
           <div v-if="externalApi.retryEnabled === 'Y'">
-            <label class="block text-sm font-medium mb-1">재시도 간격</label>
+            <label class="block text-sm font-medium mb-1">
+              재시도 간격
+              <span class="text-red-500">*</span>
+            </label>
+
             <select
+              ref="retryIntervalSecInput"
               v-model.number="externalApi.retryIntervalSec"
+              @change="errors.retryIntervalSec = ''"
               class="w-full border rounded px-3 py-2"
             >
               <option value="">선택</option>
@@ -753,6 +878,10 @@ onMounted(() => {
               <option :value="30">30초</option>
               <option :value="60">1분</option>
             </select>
+
+            <p v-if="errors.retryIntervalSec" class="mt-1 text-sm text-red-500">
+              {{ errors.retryIntervalSec }}
+            </p>
           </div>
 
           <div class="col-span-2">
@@ -796,31 +925,63 @@ onMounted(() => {
 
           <template v-if="externalApi.authType === 'API_KEY'">
             <div>
-              <label class="block text-sm font-medium mb-1">전달 위치</label>
-              <select v-model="externalApi.authLocation" class="w-full border rounded px-3 py-2">
+              <label class="block text-sm font-medium mb-1">
+                전달 위치
+                <span class="text-red-500">*</span>
+              </label>
+
+              <select
+                ref="authLocationInput"
+                v-model="externalApi.authLocation"
+                @change="errors.authLocation = ''"
+                class="w-full border rounded px-3 py-2"
+              >
                 <option value="">선택</option>
                 <option value="HEADER">HEADER</option>
                 <option value="QUERY">QUERY</option>
               </select>
+
+              <p v-if="errors.authLocation" class="mt-1 text-sm text-red-500">
+                {{ errors.authLocation }}
+              </p>
             </div>
 
             <div>
-              <label class="block text-sm font-medium mb-1">Key 이름</label>
+              <label class="block text-sm font-medium mb-1">
+                Key 이름
+                <span class="text-red-500">*</span>
+              </label>
+
               <input
+                ref="authKeyInput"
                 v-model="externalApi.authKey"
                 type="text"
+                @input="errors.authKey = ''"
                 class="w-full border rounded px-3 py-2"
               />
+
+              <p v-if="errors.authKey" class="mt-1 text-sm text-red-500">
+                {{ errors.authKey }}
+              </p>
             </div>
 
             <div>
-              <label class="block text-sm font-medium mb-1">API Key</label>
+              <label class="block text-sm font-medium mb-1">
+                API Key
+                <span v-if="!externalApi.authValueConfigured" class="text-red-500"> * </span>
+              </label>
               <input
+                ref="authValueInput"
                 v-model="externalApi.authValue"
                 type="password"
                 placeholder="변경할 경우에만 입력"
+                @input="errors.authValue = ''"
                 class="w-full border rounded px-3 py-2"
               />
+
+              <p v-if="errors.authValue" class="mt-1 text-sm text-red-500">
+                {{ errors.authValue }}
+              </p>
 
               <p
                 v-if="externalApi.authType === savedAuthType && externalApi.authValueConfigured"
@@ -833,47 +994,63 @@ onMounted(() => {
 
           <template v-if="externalApi.authType === 'BEARER'">
             <div class="col-span-2">
-              <label class="block text-sm font-medium mb-1">Bearer Token</label>
+              <label class="block text-sm font-medium mb-1">
+                Bearer Token
+                <span v-if="!externalApi.authValueConfigured" class="text-red-500"> * </span>
+              </label>
+
               <input
+                ref="authValueInput"
                 v-model="externalApi.authValue"
                 type="password"
                 placeholder="변경할 경우에만 입력"
+                @input="errors.authValue = ''"
                 class="w-full border rounded px-3 py-2"
               />
 
-              <p
-                v-if="savedAuthType === 'BEARER' && externalApi.authValueConfigured"
-                class="mt-1 text-xs text-gray-500"
-              >
-                기존 Bearer Token이 등록되어 있습니다. 변경할 경우에만 새 값을 입력하세요.
+              <p v-if="errors.authValue" class="mt-1 text-sm text-red-500">
+                {{ errors.authValue }}
               </p>
             </div>
           </template>
 
           <template v-if="externalApi.authType === 'BASIC'">
             <div>
-              <label class="block text-sm font-medium mb-1">Username</label>
+              <label class="block text-sm font-medium mb-1">
+                Username
+                <span class="text-red-500">*</span>
+              </label>
+
               <input
+                ref="authUsernameInput"
                 v-model="externalApi.authUsername"
                 type="text"
+                @input="errors.authUsername = ''"
                 class="w-full border rounded px-3 py-2"
               />
+
+              <p v-if="errors.authUsername" class="mt-1 text-sm text-red-500">
+                {{ errors.authUsername }}
+              </p>
             </div>
 
             <div>
-              <label class="block text-sm font-medium mb-1">Password</label>
+              <label class="block text-sm font-medium mb-1">
+                Password
+                <span v-if="!externalApi.authPasswordConfigured" class="text-red-500"> * </span>
+              </label>
+
               <input
+                ref="authPasswordInput"
                 v-model="externalApi.authPassword"
                 type="password"
                 placeholder="변경할 경우에만 입력"
+                @input="errors.authPassword = ''"
                 class="w-full border rounded px-3 py-2"
               />
 
-              <p
-                v-if="savedAuthType === 'BASIC' && externalApi.authPasswordConfigured"
-                class="mt-1 text-xs text-gray-500"
-              >
-                기존 Password가 등록되어 있습니다. 변경할 경우에만 새 값을 입력하세요.
+              <p v-if="errors.authPassword" class="mt-1 text-sm text-red-500">
+                {{ errors.authPassword }}
               </p>
             </div>
           </template>
@@ -926,14 +1103,23 @@ onMounted(() => {
           </div>
 
           <div>
-            <label class="block text-sm font-medium mb-1"> 페이지 번호 파라미터명 </label>
+            <label class="block text-sm font-medium mb-1">
+              페이지 번호 파라미터명
+              <span class="text-red-500">*</span>
+            </label>
 
             <input
+              ref="pageParamNameInput"
               v-model="paging.pageParamName"
               type="text"
               placeholder="예: pageNo"
+              @input="errors.pageParamName = ''"
               class="w-full border rounded px-3 py-2"
             />
+
+            <p v-if="errors.pageParamName" class="mt-1 text-sm text-red-500">
+              {{ errors.pageParamName }}
+            </p>
           </div>
 
           <div>
@@ -979,14 +1165,23 @@ onMounted(() => {
           </div>
 
           <div class="col-span-2">
-            <label class="block text-sm font-medium mb-1"> 전체 건수 경로 </label>
+            <label class="block text-sm font-medium mb-1">
+              전체 건수 경로
+              <span class="text-red-500">*</span>
+            </label>
 
             <input
+              ref="totalCountPathInput"
               v-model="paging.totalCountPath"
               type="text"
               placeholder="예: response.body.totalCount"
+              @input="errors.totalCountPath = ''"
               class="w-full border rounded px-3 py-2"
             />
+
+            <p v-if="errors.totalCountPath" class="mt-1 text-sm text-red-500">
+              {{ errors.totalCountPath }}
+            </p>
           </div>
 
           <div>
@@ -1046,12 +1241,22 @@ onMounted(() => {
             </div>
 
             <div>
-              <label class="block text-xs mb-1">이름</label>
+              <label class="block text-xs mb-1">
+                이름
+                <span class="text-red-500">*</span>
+              </label>
+
               <input
+                :ref="(el) => (paramNameInputs[index] = el)"
                 v-model="param.paramName"
                 type="text"
+                @input="errors.params[index] && (errors.params[index].paramName = '')"
                 class="w-full border rounded px-2 py-1"
               />
+
+              <p v-if="errors.params[index]?.paramName" class="mt-1 text-xs text-red-500">
+                {{ errors.params[index].paramName }}
+              </p>
             </div>
 
             <div>
@@ -1073,24 +1278,49 @@ onMounted(() => {
             </div>
 
             <div>
-              <label class="block text-xs mb-1">값</label>
+              <label class="block text-xs mb-1">
+                값
+                <span
+                  v-if="param.valueType === 'STATIC' && param.requiredYn === 'Y'"
+                  class="text-red-500"
+                >
+                  *
+                </span>
+              </label>
+
               <input
+                :ref="(el) => (paramValueInputs[index] = el)"
                 v-model="param.paramValue"
                 type="text"
                 :disabled="param.valueType !== 'STATIC'"
+                @input="errors.params[index] && (errors.params[index].paramValue = '')"
                 class="w-full border rounded px-2 py-1 disabled:bg-gray-100"
               />
+
+              <p v-if="errors.params[index]?.paramValue" class="mt-1 text-xs text-red-500">
+                {{ errors.params[index].paramValue }}
+              </p>
             </div>
 
             <div>
-              <label class="block text-xs mb-1">포맷</label>
+              <label class="block text-xs mb-1">
+                포맷
+                <span v-if="param.valueType !== 'STATIC'" class="text-red-500"> * </span>
+              </label>
+
               <input
+                :ref="(el) => (paramFormatInputs[index] = el)"
                 v-model="param.valueFormat"
                 type="text"
                 :disabled="param.valueType === 'STATIC'"
                 placeholder="예: yyyyMMdd"
+                @input="errors.params[index] && (errors.params[index].valueFormat = '')"
                 class="w-full border rounded px-2 py-1 disabled:bg-gray-100"
               />
+
+              <p v-if="errors.params[index]?.valueFormat" class="mt-1 text-xs text-red-500">
+                {{ errors.params[index].valueFormat }}
+              </p>
             </div>
 
             <div>
