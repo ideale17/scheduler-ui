@@ -24,6 +24,25 @@ const externalApi = ref({
   description: '',
 })
 
+const pagingEnabled = ref('N')
+
+const paging = ref({
+  enabled: 'Y',
+  paginationType: 'PAGE',
+  terminationType: 'TOTAL_COUNT',
+
+  pageParamLocation: 'QUERY',
+  pageParamName: '',
+  pageStart: 1,
+
+  sizeParamLocation: 'QUERY',
+  sizeParamName: '',
+  pageSize: '',
+
+  totalCountPath: '',
+  maxRequestCount: 100,
+})
+
 const params = ref([])
 
 const createEmptyParam = () => {
@@ -113,6 +132,39 @@ const validateForm = () => {
     }
   }
 
+  // 페이징 사용 시 입력값을 검증한다.
+  if (pagingEnabled.value === 'Y') {
+    if (!paging.value.pageParamName.trim()) {
+      alert('페이지 번호 파라미터명을 입력해주세요.')
+      return false
+    }
+
+    if (paging.value.pageStart === null || paging.value.pageStart < 0) {
+      alert('시작 페이지는 0 이상이어야 합니다.')
+      return false
+    }
+
+    if (!paging.value.sizeParamName.trim()) {
+      alert('페이지 크기 파라미터명을 입력해주세요.')
+      return false
+    }
+
+    if (!paging.value.pageSize || paging.value.pageSize <= 0) {
+      alert('페이지당 조회 건수는 1 이상이어야 합니다.')
+      return false
+    }
+
+    if (!paging.value.totalCountPath.trim()) {
+      alert('전체 건수 경로를 입력해주세요.')
+      return false
+    }
+
+    if (!paging.value.maxRequestCount || paging.value.maxRequestCount <= 0) {
+      alert('최대 요청 횟수는 1 이상이어야 합니다.')
+      return false
+    }
+  }
+
   // 파라미터 입력값을 검증한다.
   for (let i = 0; i < params.value.length; i += 1) {
     const param = params.value[i]
@@ -167,6 +219,15 @@ const addExternalApi = async () => {
         authUsername: authType === 'BASIC' ? externalApi.value.authUsername || null : null,
         authPassword: authType === 'BASIC' ? externalApi.value.authPassword || null : null,
       },
+
+      paging:
+        pagingEnabled.value === 'Y'
+          ? {
+              ...paging.value,
+              enabled: 'Y',
+            }
+          : null,
+
       params: params.value.map((param) => ({
         ...param,
         paramValue: param.valueType === 'STATIC' ? param.paramValue || null : null,
@@ -362,6 +423,128 @@ watch(
             />
           </div>
         </template>
+      </div>
+    </div>
+
+    <!-- 페이징 설정 -->
+    <div class="bg-white border rounded p-4 mb-4">
+      <h3 class="text-lg font-semibold mb-4">페이징 설정</h3>
+
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium mb-1">페이징 사용 여부</label>
+
+          <select v-model="pagingEnabled" class="w-full border rounded px-3 py-2">
+            <option value="N">미사용</option>
+            <option value="Y">사용</option>
+          </select>
+        </div>
+      </div>
+
+      <div v-if="pagingEnabled === 'Y'" class="grid grid-cols-2 gap-4 mt-4">
+        <div>
+          <label class="block text-sm font-medium mb-1">페이징 방식</label>
+
+          <select v-model="paging.paginationType" class="w-full border rounded px-3 py-2">
+            <option value="PAGE">PAGE</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-1">종료 조건</label>
+
+          <select v-model="paging.terminationType" class="w-full border rounded px-3 py-2">
+            <option value="TOTAL_COUNT">TOTAL_COUNT</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-1">페이지 번호 전달 위치</label>
+
+          <select v-model="paging.pageParamLocation" class="w-full border rounded px-3 py-2">
+            <option value="QUERY">QUERY</option>
+            <option value="BODY">BODY</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-1">페이지 번호 파라미터명</label>
+
+          <input
+            v-model="paging.pageParamName"
+            type="text"
+            placeholder="예: pageNo"
+            class="w-full border rounded px-3 py-2"
+          />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-1">시작 페이지</label>
+
+          <input
+            v-model.number="paging.pageStart"
+            type="number"
+            min="0"
+            class="w-full border rounded px-3 py-2"
+          />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-1">페이지 크기 전달 위치</label>
+
+          <select v-model="paging.sizeParamLocation" class="w-full border rounded px-3 py-2">
+            <option value="QUERY">QUERY</option>
+            <option value="BODY">BODY</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-1">페이지 크기 파라미터명</label>
+
+          <input
+            v-model="paging.sizeParamName"
+            type="text"
+            placeholder="예: numOfRows"
+            class="w-full border rounded px-3 py-2"
+          />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-1">페이지당 조회 건수</label>
+
+          <input
+            v-model.number="paging.pageSize"
+            type="number"
+            min="1"
+            class="w-full border rounded px-3 py-2"
+          />
+        </div>
+
+        <div class="col-span-2">
+          <label class="block text-sm font-medium mb-1">전체 건수 경로</label>
+
+          <input
+            v-model="paging.totalCountPath"
+            type="text"
+            placeholder="예: response.body.totalCount"
+            class="w-full border rounded px-3 py-2"
+          />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-1">최대 요청 횟수</label>
+
+          <input
+            v-model.number="paging.maxRequestCount"
+            type="number"
+            min="1"
+            class="w-full border rounded px-3 py-2"
+          />
+
+          <p class="mt-1 text-xs text-gray-500">
+            페이징 오류로 인한 과도한 API 호출을 방지하는 최대 요청 횟수입니다.
+          </p>
+        </div>
       </div>
     </div>
 

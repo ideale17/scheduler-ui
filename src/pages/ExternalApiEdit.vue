@@ -968,7 +968,7 @@ onMounted(() => {
           </div>
 
           <div>
-            <label class="block text-sm font-medium mb-1"> 페이지 크기 </label>
+            <label class="block text-sm font-medium mb-1"> 페이지당 조회 건수 </label>
 
             <input
               v-model.number="paging.pageSize"

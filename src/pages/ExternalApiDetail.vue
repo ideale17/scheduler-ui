@@ -345,7 +345,7 @@ onMounted(() => {
           </div>
 
           <div>
-            <div class="text-sm text-gray-500">페이지 크기</div>
+            <div class="text-sm text-gray-500">페이지당 조회 건수</div>
             <div class="mt-1">
               {{ paging.pageSize }}
             </div>
