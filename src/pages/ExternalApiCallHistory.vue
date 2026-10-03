@@ -274,7 +274,7 @@ onMounted(() => {
             <th class="border px-2 py-1">API명</th>
             <th class="border px-2 py-1">시작시간</th>
             <th class="border px-2 py-1">상태</th>
-            <th class="border px-2 py-1">시도횟수</th>
+            <th class="border px-2 py-1">요청횟수</th>
             <th class="border px-2 py-1">재시도</th>
             <th class="border px-2 py-1">전체시간</th>
             <th class="border px-2 py-1">API시간</th>
@@ -317,7 +317,7 @@ onMounted(() => {
                 </span>
               </td>
 
-              <td class="border px-2 py-1 text-center">{{ history.attemptCount }}회</td>
+              <td class="border px-2 py-1 text-center">{{ history.requestCount }}회</td>
 
               <td class="border px-2 py-1 text-center">{{ history.retryCount }}회</td>
 
@@ -358,6 +358,7 @@ onMounted(() => {
                   >
                     <thead class="bg-gray-100">
                       <tr>
+                        <th class="border px-2 py-1">요청순번</th>
                         <th class="border px-2 py-1">호출 구분</th>
                         <th class="border px-2 py-1">상태</th>
                         <th class="border px-2 py-1">HTTP</th>
@@ -369,6 +370,10 @@ onMounted(() => {
 
                     <tbody>
                       <tr v-for="detail in detailList" :key="detail.apiCallLogId">
+                        <td class="border px-2 py-1 text-center">
+                          {{ detail.requestSequence }}
+                        </td>
+
                         <td class="border px-2 py-1 text-center">
                           {{
                             detail.attemptNo === 1 ? '최초 호출' : `재시도 ${detail.attemptNo - 1}`
