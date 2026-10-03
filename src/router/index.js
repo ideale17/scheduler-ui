@@ -25,9 +25,9 @@ const routes = [
       {
         path: '',
         component: DashboardView,
-        meta: { title: 'Dashboard', requiresAuth: true },
+        meta: { title: '대시보드', requiresAuth: true },
       },
-      { path: 'jobList', component: JobList, meta: { title: 'Job 목록', requiresAuth: true } },
+      { path: 'jobList', component: JobList, meta: { title: 'Job 관리', requiresAuth: true } },
       { path: 'add', component: AddJobForm, meta: { title: 'Job 등록', requiresAuth: true } },
       {
         path: 'edit/:jobName/:jobGroup',
@@ -37,13 +37,13 @@ const routes = [
       {
         path: 'JobHistory',
         component: JobHistory,
-        meta: { title: 'Job 이력 목록', requiresAuth: true },
+        meta: { title: 'Job 실행 이력', requiresAuth: true },
       },
       {
         path: 'externalApi',
         component: ExternalApiList,
         meta: {
-          title: 'External API',
+          title: 'API 관리',
           requiresAuth: true,
         },
       },
@@ -51,7 +51,7 @@ const routes = [
         path: 'externalApi/:externalApiId',
         component: ExternalApiDetail,
         meta: {
-          title: 'External API 상세',
+          title: 'API 상세',
           requiresAuth: true,
         },
       },
@@ -59,7 +59,7 @@ const routes = [
         path: 'externalApi/history',
         component: ExternalApiCallHistory,
         meta: {
-          title: 'External API 호출 이력',
+          title: 'API 실행 이력',
           requiresAuth: true,
         },
       },
@@ -67,7 +67,7 @@ const routes = [
         path: 'externalApi/add',
         component: ExternalApiAdd,
         meta: {
-          title: 'External API 등록',
+          title: 'API 등록',
           requiresAuth: true,
         },
       },
@@ -75,7 +75,7 @@ const routes = [
         path: 'externalApi/:externalApiId/edit',
         component: ExternalApiEdit,
         meta: {
-          title: 'External API 수정',
+          title: 'API 수정',
           requiresAuth: true,
         },
       },
