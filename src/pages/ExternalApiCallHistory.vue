@@ -347,6 +347,18 @@ onMounted(() => {
             <!-- 상세 -->
             <tr v-if="selectedHistoryId === history.executionId">
               <td colspan="9" class="border bg-gray-50 p-4">
+                <!-- External API 전체 실행 실패 사유 -->
+                <div
+                  v-if="history.status === 'FAILED' && history.errorMessage"
+                  class="mb-4 rounded border border-red-200 bg-red-50 p-3"
+                >
+                  <div class="mb-1 text-sm font-semibold text-red-700">실행 실패 사유</div>
+
+                  <div class="text-sm text-red-700">
+                    {{ history.errorMessage }}
+                  </div>
+                </div>
+
                 <div class="mt-4 border-t border-gray-200 pt-4">
                   <h4 class="mb-3 text-sm font-semibold text-gray-800">호출 시도 이력</h4>
 
