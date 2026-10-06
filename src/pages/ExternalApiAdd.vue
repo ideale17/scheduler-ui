@@ -156,7 +156,25 @@ const validateForm = () => {
     return setFieldError(errors, 'apiUrl', 'API URL을 입력해주세요.', apiUrlInput.value)
   }
 
-  // 3. 재시도 설정을 검증한다.
+  // 3. URL 형식과 프로토콜을 검증한다.
+  let url
+
+  try {
+    url = new URL(externalApi.value.apiUrl.trim())
+  } catch {
+    return setFieldError(errors, 'apiUrl', '올바른 URL을 입력해주세요.', apiUrlInput.value)
+  }
+
+  if (!['http:', 'https:'].includes(url.protocol)) {
+    return setFieldError(
+      errors,
+      'apiUrl',
+      'HTTP 또는 HTTPS URL만 사용할 수 있습니다.',
+      apiUrlInput.value,
+    )
+  }
+
+  // 4. 재시도 설정을 검증한다.
   if (externalApi.value.retryEnabled === 'Y') {
     if (!externalApi.value.maxRetryCount || externalApi.value.maxRetryCount <= 0) {
       return setFieldError(
@@ -177,7 +195,7 @@ const validateForm = () => {
     }
   }
 
-  // 4. 인증 방식별 필수 입력값을 검증한다.
+  // 5. 인증 방식별 필수 입력값을 검증한다.
   if (externalApi.value.authType === 'API_KEY') {
     if (!externalApi.value.authLocation) {
       return setFieldError(
@@ -228,7 +246,7 @@ const validateForm = () => {
     }
   }
 
-  // 5. 페이징 사용 시 입력값을 검증한다.
+  // 6. 페이징 사용 시 입력값을 검증한다.
   if (pagingEnabled.value === 'Y') {
     if (!paging.value.pageParamName.trim()) {
       return setFieldError(
@@ -285,7 +303,7 @@ const validateForm = () => {
     }
   }
 
-  // 6. 파라미터 입력값을 검증한다.
+  // 7. 파라미터 입력값을 검증한다.
   for (let i = 0; i < params.value.length; i += 1) {
     const param = params.value[i]
 

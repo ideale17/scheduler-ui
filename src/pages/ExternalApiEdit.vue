@@ -386,7 +386,25 @@ const validateBasicInfo = () => {
     return setFieldError(errors, 'apiUrl', 'API URL을 입력해주세요.', apiUrlInput.value)
   }
 
-  // 4. 재시도 설정을 검증한다.
+  let url
+
+  try {
+    url = new URL(externalApi.value.apiUrl.trim())
+  } catch {
+    return setFieldError(errors, 'apiUrl', '올바른 URL을 입력해주세요.', apiUrlInput.value)
+  }
+
+  // 4. 프로토콜을 검증한다.
+  if (!['http:', 'https:'].includes(url.protocol)) {
+    return setFieldError(
+      errors,
+      'apiUrl',
+      'HTTP 또는 HTTPS URL만 사용할 수 있습니다.',
+      apiUrlInput.value,
+    )
+  }
+
+  // 5. 재시도 설정을 검증한다.
   if (externalApi.value.retryEnabled === 'Y') {
     if (!externalApi.value.maxRetryCount) {
       return setFieldError(
