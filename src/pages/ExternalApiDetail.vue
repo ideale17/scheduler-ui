@@ -109,81 +109,90 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="p-4">
-    <div v-if="loading" class="text-gray-500">조회 중입니다.</div>
+  <div class="space-y-4">
+    <!-- 조회 중 -->
+    <div
+      v-if="loading"
+      class="rounded-lg border border-gray-200 bg-white p-6 text-sm text-gray-500"
+    >
+      External API 정보를 불러오는 중입니다.
+    </div>
 
     <template v-else-if="externalApi">
       <!-- 기본 정보 -->
-      <div class="bg-white border rounded p-4 mb-4">
-        <div class="flex justify-between items-center mb-4">
-          <h3 class="text-lg font-semibold">기본 정보</h3>
+      <section class="rounded-lg border border-gray-200 bg-white p-5">
+        <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 class="text-base font-semibold text-gray-900">기본 정보</h3>
+            <p class="mt-1 text-sm text-gray-500">External API의 기본 호출 설정을 확인합니다.</p>
+          </div>
 
-          <div class="flex gap-2">
+          <div class="flex flex-wrap items-center gap-2">
             <button
               type="button"
+              class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
               @click="executeApi"
-              class="bg-purple-500 text-white px-3 py-1 rounded hover:bg-purple-600"
             >
               즉시 실행
             </button>
 
             <button
               type="button"
+              class="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700"
               @click="router.push(`/externalApi/${externalApi.externalApiId}/edit`)"
-              class="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
             >
               수정
             </button>
 
             <button
               type="button"
+              class="rounded-md px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50"
               @click="deleteApi"
-              class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
             >
               삭제
             </button>
 
             <button
               type="button"
+              class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
               @click="router.push('/externalApi')"
-              class="bg-gray-300 px-3 py-1 rounded"
             >
               목록
             </button>
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
           <div>
-            <div class="text-sm text-gray-500">API 이름</div>
-            <div class="mt-1">
+            <div class="text-xs font-medium text-gray-500">API 이름</div>
+            <div class="mt-1 text-sm font-medium text-gray-900">
               {{ externalApi.apiName }}
             </div>
           </div>
 
           <div>
-            <div class="text-sm text-gray-500">HTTP Method</div>
+            <div class="text-xs font-medium text-gray-500">HTTP Method</div>
 
             <span
-              class="inline-flex mt-1 rounded-full px-2 py-0.5 text-xs font-medium"
+              class="mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-medium"
               :class="getMethodClass(externalApi.httpMethod)"
             >
               {{ externalApi.httpMethod }}
             </span>
           </div>
 
-          <div class="col-span-2">
-            <div class="text-sm text-gray-500">API URL</div>
-            <div class="mt-1 break-all">
+          <div class="md:col-span-2">
+            <div class="text-xs font-medium text-gray-500">API URL</div>
+            <div class="mt-1 break-all text-sm text-gray-700">
               {{ externalApi.apiUrl }}
             </div>
           </div>
 
           <div>
-            <div class="text-sm text-gray-500">사용 여부</div>
+            <div class="text-xs font-medium text-gray-500">사용 여부</div>
 
             <span
-              class="inline-flex mt-1 rounded-full px-2 py-0.5 text-xs font-medium"
+              class="mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-medium"
               :class="getEnabledClass(externalApi.enabled)"
             >
               {{ getEnabledLabel(externalApi.enabled) }}
@@ -191,10 +200,10 @@ onMounted(() => {
           </div>
 
           <div>
-            <div class="text-sm text-gray-500">재시도 사용 여부</div>
+            <div class="text-xs font-medium text-gray-500">재시도 사용 여부</div>
 
             <span
-              class="inline-flex mt-1 rounded-full px-2 py-0.5 text-xs font-medium"
+              class="mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-medium"
               :class="getEnabledClass(externalApi.retryEnabled)"
             >
               {{ getEnabledLabel(externalApi.retryEnabled) }}
@@ -202,228 +211,286 @@ onMounted(() => {
           </div>
 
           <div v-if="externalApi.retryEnabled === 'Y'">
-            <div class="text-sm text-gray-500">최대 재시도 횟수</div>
-            <div class="mt-1">{{ externalApi.maxRetryCount }}회</div>
+            <div class="text-xs font-medium text-gray-500">최대 재시도 횟수</div>
+            <div class="mt-1 text-sm text-gray-700">{{ externalApi.maxRetryCount }}회</div>
           </div>
 
           <div v-if="externalApi.retryEnabled === 'Y'">
-            <div class="text-sm text-gray-500">재시도 간격</div>
-            <div class="mt-1">{{ externalApi.retryIntervalSec }}초</div>
+            <div class="text-xs font-medium text-gray-500">재시도 간격</div>
+            <div class="mt-1 text-sm text-gray-700">{{ externalApi.retryIntervalSec }}초</div>
           </div>
 
-          <div>
-            <div class="text-sm text-gray-500">설명</div>
-            <div class="mt-1">
+          <div class="md:col-span-2">
+            <div class="text-xs font-medium text-gray-500">설명</div>
+            <div class="mt-1 text-sm text-gray-700">
               {{ externalApi.description || '-' }}
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
       <!-- 인증 정보 -->
-      <div class="bg-white border rounded p-4 mb-4">
-        <h3 class="text-lg font-semibold mb-4">인증 정보</h3>
+      <section class="rounded-lg border border-gray-200 bg-white p-5">
+        <div class="mb-5">
+          <h3 class="text-base font-semibold text-gray-900">인증 정보</h3>
+          <p class="mt-1 text-sm text-gray-500">API 호출에 사용되는 인증 방식을 확인합니다.</p>
+        </div>
 
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
           <div>
-            <div class="text-sm text-gray-500">인증 방식</div>
-            <div class="mt-1">
+            <div class="text-xs font-medium text-gray-500">인증 방식</div>
+            <div class="mt-1 text-sm font-medium text-gray-900">
               {{ externalApi.authType || 'NONE' }}
             </div>
           </div>
 
           <template v-if="externalApi.authType === 'API_KEY'">
             <div>
-              <div class="text-sm text-gray-500">전달 위치</div>
-              <div class="mt-1">
+              <div class="text-xs font-medium text-gray-500">전달 위치</div>
+              <div class="mt-1 text-sm text-gray-700">
                 {{ externalApi.authLocation || '-' }}
               </div>
             </div>
 
             <div>
-              <div class="text-sm text-gray-500">Key 이름</div>
-              <div class="mt-1">
+              <div class="text-xs font-medium text-gray-500">Key 이름</div>
+              <div class="mt-1 text-sm text-gray-700">
                 {{ externalApi.authKey || '-' }}
               </div>
             </div>
 
             <div>
-              <div class="text-sm text-gray-500">API Key</div>
-              <div class="mt-1">********</div>
+              <div class="text-xs font-medium text-gray-500">API Key</div>
+              <div class="mt-1 text-sm text-gray-700">********</div>
             </div>
           </template>
 
           <template v-if="externalApi.authType === 'BEARER'">
             <div>
-              <div class="text-sm text-gray-500">Bearer Token</div>
-              <div class="mt-1">********</div>
+              <div class="text-xs font-medium text-gray-500">Bearer Token</div>
+              <div class="mt-1 text-sm text-gray-700">********</div>
             </div>
           </template>
 
           <template v-if="externalApi.authType === 'BASIC'">
             <div>
-              <div class="text-sm text-gray-500">Username</div>
-              <div class="mt-1">
+              <div class="text-xs font-medium text-gray-500">Username</div>
+              <div class="mt-1 text-sm text-gray-700">
                 {{ externalApi.authUsername || '-' }}
               </div>
             </div>
 
             <div>
-              <div class="text-sm text-gray-500">Password</div>
-              <div class="mt-1">********</div>
+              <div class="text-xs font-medium text-gray-500">Password</div>
+              <div class="mt-1 text-sm text-gray-700">********</div>
             </div>
           </template>
 
           <div v-if="!externalApi.authType || externalApi.authType === 'NONE'">
-            <div class="text-sm text-gray-500">인증 정보</div>
-            <div class="mt-1">사용하지 않음</div>
+            <div class="text-xs font-medium text-gray-500">인증 정보</div>
+            <div class="mt-1 text-sm text-gray-700">사용하지 않음</div>
           </div>
         </div>
-      </div>
+      </section>
 
       <!-- 페이징 설정 -->
-      <div class="bg-white border rounded p-4 mb-4">
-        <div class="flex justify-between items-center mb-4">
-          <h3 class="text-lg font-semibold">페이징 설정</h3>
+      <section class="rounded-lg border border-gray-200 bg-white p-5">
+        <div class="mb-5 flex items-center justify-between gap-4">
+          <div>
+            <h3 class="text-base font-semibold text-gray-900">페이징 설정</h3>
+            <p class="mt-1 text-sm text-gray-500">
+              여러 페이지로 제공되는 API의 반복 호출 설정입니다.
+            </p>
+          </div>
 
           <span
-            class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
+            class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium"
             :class="paging ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
           >
             {{ paging ? '설정됨' : '미설정' }}
           </span>
         </div>
 
-        <div v-if="paging" class="grid grid-cols-2 gap-4">
+        <div v-if="paging" class="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
           <div>
-            <div class="text-sm text-gray-500">페이징 방식</div>
-            <div class="mt-1">
+            <div class="text-xs font-medium text-gray-500">페이징 방식</div>
+            <div class="mt-1 text-sm text-gray-700">
               {{ paging.paginationType }}
             </div>
           </div>
 
           <div>
-            <div class="text-sm text-gray-500">종료 조건</div>
-            <div class="mt-1">
+            <div class="text-xs font-medium text-gray-500">종료 조건</div>
+            <div class="mt-1 text-sm text-gray-700">
               {{ paging.terminationType }}
             </div>
           </div>
 
           <div>
-            <div class="text-sm text-gray-500">페이지 번호 전달 위치</div>
-            <div class="mt-1">
+            <div class="text-xs font-medium text-gray-500">페이지 번호 전달 위치</div>
+            <div class="mt-1 text-sm text-gray-700">
               {{ paging.pageParamLocation }}
             </div>
           </div>
 
           <div>
-            <div class="text-sm text-gray-500">페이지 번호 파라미터명</div>
-            <div class="mt-1">
+            <div class="text-xs font-medium text-gray-500">페이지 번호 파라미터명</div>
+            <div class="mt-1 text-sm text-gray-700">
               {{ paging.pageParamName }}
             </div>
           </div>
 
           <div>
-            <div class="text-sm text-gray-500">시작 페이지</div>
-            <div class="mt-1">
+            <div class="text-xs font-medium text-gray-500">시작 페이지</div>
+            <div class="mt-1 text-sm text-gray-700">
               {{ paging.pageStart }}
             </div>
           </div>
 
           <div>
-            <div class="text-sm text-gray-500">페이지 크기 전달 위치</div>
-            <div class="mt-1">
+            <div class="text-xs font-medium text-gray-500">페이지 크기 전달 위치</div>
+            <div class="mt-1 text-sm text-gray-700">
               {{ paging.sizeParamLocation }}
             </div>
           </div>
 
           <div>
-            <div class="text-sm text-gray-500">페이지 크기 파라미터명</div>
-            <div class="mt-1">
+            <div class="text-xs font-medium text-gray-500">페이지 크기 파라미터명</div>
+            <div class="mt-1 text-sm text-gray-700">
               {{ paging.sizeParamName }}
             </div>
           </div>
 
           <div>
-            <div class="text-sm text-gray-500">페이지당 조회 건수</div>
-            <div class="mt-1">
+            <div class="text-xs font-medium text-gray-500">페이지당 조회 건수</div>
+            <div class="mt-1 text-sm text-gray-700">
               {{ paging.pageSize }}
             </div>
           </div>
 
-          <div class="col-span-2">
-            <div class="text-sm text-gray-500">전체 건수 경로</div>
-            <div class="mt-1">
+          <div class="md:col-span-2">
+            <div class="text-xs font-medium text-gray-500">전체 건수 경로</div>
+            <div class="mt-1 break-all text-sm text-gray-700">
               {{ paging.totalCountPath }}
             </div>
           </div>
 
           <div>
-            <div class="text-sm text-gray-500">최대 요청 횟수</div>
-            <div class="mt-1">{{ paging.maxRequestCount }}회</div>
+            <div class="text-xs font-medium text-gray-500">최대 요청 횟수</div>
+            <div class="mt-1 text-sm text-gray-700">{{ paging.maxRequestCount }}회</div>
           </div>
         </div>
 
-        <div v-else class="text-gray-500">등록된 페이징 설정이 없습니다.</div>
-      </div>
+        <div
+          v-else
+          class="rounded-md border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500"
+        >
+          등록된 페이징 설정이 없습니다.
+        </div>
+      </section>
 
       <!-- 파라미터 -->
-      <div class="bg-white border rounded p-4">
-        <h3 class="text-lg font-semibold mb-4">파라미터</h3>
+      <section class="rounded-lg border border-gray-200 bg-white p-5">
+        <div class="mb-4">
+          <h3 class="text-base font-semibold text-gray-900">파라미터</h3>
+          <p class="mt-1 text-sm text-gray-500">
+            API 호출 시 전달되는 Header, Query, Body 파라미터입니다.
+          </p>
+        </div>
 
-        <table v-if="params.length > 0" class="w-full border border-gray-300">
-          <thead class="bg-gray-100">
-            <tr>
-              <th class="border px-2 py-1">위치</th>
-              <th class="border px-2 py-1">이름</th>
-              <th class="border px-2 py-1">값 유형</th>
-              <th class="border px-2 py-1">값</th>
-              <th class="border px-2 py-1">포맷</th>
-              <th class="border px-2 py-1">필수</th>
-              <th class="border px-2 py-1">순서</th>
-              <th class="border px-2 py-1">설명</th>
-            </tr>
-          </thead>
+        <div v-if="params.length > 0" class="overflow-x-auto rounded-lg border border-gray-200">
+          <table class="w-full text-sm">
+            <thead class="border-b border-gray-200 bg-gray-50">
+              <tr>
+                <th class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500">
+                  위치
+                </th>
+                <th class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500">
+                  이름
+                </th>
+                <th class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500">
+                  값 유형
+                </th>
+                <th class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500">
+                  값
+                </th>
+                <th class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500">
+                  포맷
+                </th>
+                <th class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500">
+                  필수
+                </th>
+                <th class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500">
+                  순서
+                </th>
+                <th class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500">
+                  설명
+                </th>
+              </tr>
+            </thead>
 
-          <tbody>
-            <tr v-for="param in params" :key="param.paramId">
-              <td class="border px-2 py-1 text-center">
-                {{ param.paramLocation }}
-              </td>
+            <tbody class="divide-y divide-gray-100">
+              <tr
+                v-for="param in params"
+                :key="param.paramId"
+                class="transition-colors hover:bg-gray-50"
+              >
+                <td class="px-4 py-3 text-center text-gray-600">
+                  {{ param.paramLocation }}
+                </td>
 
-              <td class="border px-2 py-1">
-                {{ param.paramName }}
-              </td>
+                <td class="px-4 py-3 text-center font-medium text-gray-900">
+                  {{ param.paramName }}
+                </td>
 
-              <td class="border px-2 py-1">
-                {{ param.valueType }}
-              </td>
+                <td class="px-4 py-3 text-center text-gray-600">
+                  {{ param.valueType }}
+                </td>
 
-              <td class="border px-2 py-1">
-                {{ param.paramValue || '-' }}
-              </td>
+                <td class="max-w-xs px-4 py-3 text-gray-600">
+                  <div class="truncate" :title="param.paramValue || ''">
+                    {{ param.paramValue || '-' }}
+                  </div>
+                </td>
 
-              <td class="border px-2 py-1">
-                {{ param.valueFormat || '-' }}
-              </td>
+                <td class="px-4 py-3 text-center text-gray-600">
+                  {{ param.valueFormat || '-' }}
+                </td>
 
-              <td class="border px-2 py-1 text-center">
-                {{ param.requiredYn === 'Y' ? '필수' : '선택' }}
-              </td>
+                <td class="px-4 py-3 text-center">
+                  <span
+                    class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium"
+                    :class="
+                      param.requiredYn === 'Y'
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-gray-100 text-gray-600'
+                    "
+                  >
+                    {{ param.requiredYn === 'Y' ? '필수' : '선택' }}
+                  </span>
+                </td>
 
-              <td class="border px-2 py-1 text-center">
-                {{ param.sortOrder }}
-              </td>
+                <td class="px-4 py-3 text-center text-gray-600">
+                  {{ param.sortOrder }}
+                </td>
 
-              <td class="border px-2 py-1">
-                {{ param.description || '-' }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+                <td class="max-w-xs px-4 py-3 text-gray-600">
+                  <div class="truncate" :title="param.description || ''">
+                    {{ param.description || '-' }}
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
-        <div v-else class="text-gray-500">등록된 파라미터가 없습니다.</div>
-      </div>
+        <div
+          v-else
+          class="rounded-md border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500"
+        >
+          등록된 파라미터가 없습니다.
+        </div>
+      </section>
     </template>
   </div>
 </template>

@@ -1,25 +1,68 @@
 <script setup>
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
-import { computed, ref, onMounted } from 'vue'
 import { getCurrentUser, logoutUser } from '@/api/authApi'
 
 const route = useRoute()
 const router = useRouter()
 
-const menus = [
-  { to: '/jobList', label: 'Job 관리' },
-  { to: '/JobHistory', label: 'Job 실행 이력' },
-  { to: '/externalApi', label: 'API 관리' },
-  { to: '/externalApi/history', label: 'API 실행 이력' },
-  { to: '/schedulerInfo', label: 'Scheduler 정보' },
+const menuGroups = [
+  {
+    label: 'OVERVIEW',
+    menus: [{ to: '/', label: '대시보드', match: 'dashboard' }],
+  },
+  {
+    label: 'SCHEDULER',
+    menus: [
+      { to: '/jobList', label: 'Job 관리', match: 'job' },
+      { to: '/JobHistory', label: 'Job 실행 이력', match: 'jobHistory' },
+    ],
+  },
+  {
+    label: 'API MANAGEMENT',
+    menus: [
+      { to: '/externalApi', label: 'API 관리', match: 'externalApi' },
+      { to: '/externalApi/history', label: 'API 실행 이력', match: 'externalApiHistory' },
+    ],
+  },
+  {
+    label: 'SYSTEM',
+    menus: [{ to: '/schedulerInfo', label: 'Scheduler 정보', match: 'schedulerInfo' }],
+  },
 ]
-const isActive = (path) => route.path === path
 
-// meta.title 값을 가져오는 computed
+const isActive = (menu) => {
+  switch (menu.match) {
+    case 'dashboard':
+      return route.path === '/'
+
+    case 'job':
+      return route.path === '/jobList' || route.path === '/add' || route.path.startsWith('/edit/')
+
+    case 'jobHistory':
+      return route.path === '/JobHistory'
+
+    case 'externalApi':
+      return (
+        route.path === '/externalApi' ||
+        (route.path.startsWith('/externalApi/') && route.path !== '/externalApi/history')
+      )
+
+    case 'externalApiHistory':
+      return route.path === '/externalApi/history'
+
+    case 'schedulerInfo':
+      return route.path === '/schedulerInfo'
+
+    default:
+      return false
+  }
+}
+
 const pageTitle = computed(() => route.meta.title || '')
 
-// (선택) 사용자 표시용
 const username = ref(null)
+
 onMounted(async () => {
   try {
     const { data } = await getCurrentUser()
@@ -34,51 +77,94 @@ const logout = async () => {
   try {
     await logoutUser()
   } finally {
-    router.push('/login') // 세션 파기 후 로그인 화면으로
+    router.push('/login')
   }
 }
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 text-gray-900 flex">
+  <div class="flex min-h-screen bg-gray-50 text-gray-900">
     <!-- 왼쪽 메뉴 -->
-    <aside class="w-56 bg-white border-r min-h-screen">
-      <RouterLink to="/" class="h-14 flex items-center px-4 font-semibold hover:bg-gray-50">
-        🗓 Scheduler
+    <aside class="min-h-screen w-60 shrink-0 border-r border-gray-200 bg-white">
+      <!-- 서비스명 -->
+      <RouterLink
+        to="/"
+        class="flex h-16 items-center border-b border-gray-100 px-5 hover:bg-gray-50"
+      >
+        <div>
+          <div class="text-base font-semibold text-gray-900">Scheduler</div>
+          <div class="mt-0.5 text-xs text-gray-500">Quartz Management</div>
+        </div>
       </RouterLink>
-      <nav class="px-2 py-2 space-y-1">
-        <RouterLink
-          v-for="m in menus"
-          :key="m.to"
-          :to="m.to"
-          :class="[
-            'block px-3 py-2 rounded text-sm',
-            isActive(m.to) ? 'bg-gray-900 text-white' : 'hover:bg-gray-100',
-          ]"
+
+      <!-- 메뉴 -->
+      <nav class="px-3 py-4">
+        <div
+          v-for="(group, groupIndex) in menuGroups"
+          :key="group.label"
+          :class="groupIndex > 0 ? 'mt-6' : ''"
         >
-          {{ m.label }}
-        </RouterLink>
+          <div class="mb-2 flex items-center gap-2 px-3">
+            <span class="text-xs font-semibold tracking-wider text-gray-400">
+              {{ group.label }}
+            </span>
+
+            <div class="h-px flex-1 bg-gray-200"></div>
+          </div>
+
+          <div class="space-y-1">
+            <RouterLink
+              v-for="menu in group.menus"
+              :key="menu.to"
+              :to="menu.to"
+              :class="[
+                'block rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                isActive(menu)
+                  ? 'bg-gray-900 text-white'
+                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
+              ]"
+            >
+              {{ menu.label }}
+            </RouterLink>
+          </div>
+        </div>
       </nav>
     </aside>
 
     <!-- 메인 영역 -->
-    <main class="flex-1 min-w-0 flex flex-col">
+    <main class="flex min-w-0 flex-1 flex-col">
       <!-- 상단바 -->
-      <header class="flex items-center justify-between p-4 border-b bg-white">
-        <h2 class="text-xl font-semibold">{{ pageTitle }}</h2>
+      <header class="flex h-16 items-center justify-between border-b border-gray-200 bg-white px-6">
+        <h2 class="text-xl font-semibold text-gray-900">
+          {{ pageTitle }}
+        </h2>
 
-        <!-- 우측 사용자/로그아웃 -->
         <div class="flex items-center gap-3">
-          <span v-if="username" class="text-sm text-gray-600">👤 {{ username }}</span>
-          <button @click="logout" class="px-3 py-1.5 text-sm rounded bg-gray-200 hover:bg-gray-300">
+          <div v-if="username" class="flex items-center gap-2">
+            <div
+              class="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-sm font-semibold text-gray-600"
+            >
+              {{ username.charAt(0).toUpperCase() }}
+            </div>
+
+            <span class="text-sm text-gray-600">
+              {{ username }}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+            @click="logout"
+          >
             로그아웃
           </button>
         </div>
       </header>
 
       <!-- 본문 영역 -->
-      <section class="flex-1 min-w-0 p-4 bg-gray-50">
-        <router-view />
+      <section class="min-w-0 flex-1 bg-gray-50 p-6">
+        <RouterView />
       </section>
     </main>
   </div>

@@ -172,41 +172,38 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="flex min-h-full flex-col p-4">
-    <div class="flex justify-end items-center mb-4">
-      <!-- <h2 class="text-2xl font-bold">📋 등록된 Job 목록</h2> -->
-    </div>
-
-    <div class="mb-4 rounded border border-gray-200 bg-white p-4">
-      <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-5">
+  <div class="space-y-4">
+    <!-- 검색조건 -->
+    <div class="rounded-lg border border-gray-200 bg-white p-4">
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
         <div>
-          <label class="mb-1 block text-sm font-medium text-gray-700"> Job명 </label>
+          <label class="mb-1 block text-sm font-medium text-gray-700">Job명</label>
 
           <input
             v-model="searchCondition.jobName"
             type="text"
-            class="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
             placeholder="Job명"
           />
         </div>
 
         <div>
-          <label class="mb-1 block text-sm font-medium text-gray-700"> Job 그룹 </label>
+          <label class="mb-1 block text-sm font-medium text-gray-700">Job 그룹</label>
 
           <input
             v-model="searchCondition.jobGroup"
             type="text"
-            class="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
             placeholder="Job 그룹"
           />
         </div>
 
         <div>
-          <label class="mb-1 block text-sm font-medium text-gray-700"> 실행 상태 </label>
+          <label class="mb-1 block text-sm font-medium text-gray-700">실행 상태</label>
 
           <select
             v-model="searchCondition.status"
-            class="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
           >
             <option value="">전체</option>
             <option value="SUCCESS">성공</option>
@@ -215,30 +212,30 @@ onMounted(() => {
         </div>
 
         <div>
-          <label class="mb-1 block text-sm font-medium text-gray-700"> 시작일 </label>
+          <label class="mb-1 block text-sm font-medium text-gray-700">시작일</label>
 
           <input
             v-model="searchCondition.startDate"
             type="date"
-            class="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
           />
         </div>
 
         <div>
-          <label class="mb-1 block text-sm font-medium text-gray-700"> 종료일 </label>
+          <label class="mb-1 block text-sm font-medium text-gray-700">종료일</label>
 
           <input
             v-model="searchCondition.endDate"
             type="date"
-            class="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
           />
         </div>
       </div>
 
-      <div class="mt-3 flex justify-end gap-2">
+      <div class="mt-4 flex justify-end gap-2">
         <button
           type="button"
-          class="rounded bg-gray-500 px-4 py-2 text-sm text-white hover:bg-gray-600"
+          class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
           @click="resetSearchCondition"
         >
           초기화
@@ -246,7 +243,7 @@ onMounted(() => {
 
         <button
           type="button"
-          class="rounded bg-blue-500 px-4 py-2 text-sm text-white hover:bg-blue-600"
+          class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
           @click="searchJobHistory"
         >
           조회
@@ -254,57 +251,95 @@ onMounted(() => {
       </div>
     </div>
 
-    <div v-if="historyList.length > 0" class="min-h-[420px] overflow-x-auto">
-      <table class="w-full border border-gray-300 text-sm">
-        <thead class="bg-gray-100">
+    <!-- 실행 이력 -->
+    <div
+      v-if="historyList.length > 0"
+      class="min-h-[420px] overflow-x-auto rounded-lg border border-gray-200 bg-white"
+    >
+      <table class="w-full text-sm">
+        <thead class="border-b border-gray-200 bg-gray-50">
           <tr>
-            <th class="border px-2 py-1">Job명</th>
-            <th class="border px-2 py-1">Job 그룹</th>
-            <th class="border px-2 py-1">Trigger명</th>
-            <th class="border px-2 py-1">예정 실행시간</th>
-            <th class="border px-2 py-1">실제 실행시간</th>
-            <th class="border px-2 py-1">실행 시간</th>
-            <th class="border px-2 py-1">상태</th>
-            <th class="border px-2 py-1">상세</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500">
+              Job명
+            </th>
+            <th class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500">
+              Job 그룹
+            </th>
+            <th class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500">
+              Trigger명
+            </th>
+            <th class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500">
+              예정 실행시간
+            </th>
+            <th class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500">
+              실제 실행시간
+            </th>
+            <th class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500">
+              실행 시간
+            </th>
+            <th class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500">
+              상태
+            </th>
+            <th class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500">
+              상세
+            </th>
           </tr>
         </thead>
-        <tbody>
-          <template v-for="h in historyList" :key="h.logId">
-            <tr>
-              <td class="border px-2 py-1">{{ h.jobName }}</td>
-              <td class="border px-2 py-1">{{ h.jobGroup }}</td>
-              <td class="border px-2 py-1">{{ h.triggerName }}</td>
-              <td class="border px-2 py-1">{{ formatDateTime(h.scheduledFireTime) }}</td>
-              <td class="border px-2 py-1">{{ formatDateTime(h.actualFireTime) }}</td>
-              <td class="border px-2 py-1">{{ formatRunMillis(h.runMillis) }}</td>
 
-              <td class="border px-2 py-1 text-center">
+        <tbody class="divide-y divide-gray-100">
+          <template v-for="h in historyList" :key="h.logId">
+            <tr class="transition-colors hover:bg-gray-50">
+              <td class="px-4 py-3 text-center font-medium text-gray-900">
+                {{ h.jobName }}
+              </td>
+
+              <td class="px-4 py-3 text-center text-gray-600">
+                {{ h.jobGroup }}
+              </td>
+
+              <td class="px-4 py-3 text-center text-gray-600">
+                {{ h.triggerName }}
+              </td>
+
+              <td class="whitespace-nowrap px-4 py-3 text-center text-gray-600">
+                {{ formatDateTime(h.scheduledFireTime) }}
+              </td>
+
+              <td class="whitespace-nowrap px-4 py-3 text-center text-gray-600">
+                {{ formatDateTime(h.actualFireTime) }}
+              </td>
+
+              <td class="whitespace-nowrap px-4 py-3 text-center text-gray-600">
+                {{ formatRunMillis(h.runMillis) }}
+              </td>
+
+              <td class="px-4 py-3 text-center">
                 <span
                   v-if="h.status === 'SUCCESS'"
-                  class="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700"
+                  class="inline-flex rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700"
                 >
                   성공
                 </span>
 
                 <span
                   v-else-if="h.status === 'FAILED'"
-                  class="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700"
+                  class="inline-flex rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700"
                 >
                   실패
                 </span>
 
                 <span
                   v-else
-                  class="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700"
+                  class="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700"
                 >
                   {{ h.status }}
                 </span>
               </td>
 
-              <td class="border px-2 py-1 text-center">
+              <td class="px-4 py-3 text-center">
                 <button
                   type="button"
-                  class="rounded border border-gray-300 bg-white px-3 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                  class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
                   @click="toggleHistoryDetail(h.logId)"
                 >
                   {{ selectedHistoryId === h.logId ? '닫기' : '상세' }}
@@ -312,41 +347,42 @@ onMounted(() => {
               </td>
             </tr>
 
+            <!-- 상세 -->
             <tr v-if="selectedHistoryId === h.logId">
-              <td colspan="8" class="border bg-gray-50 p-4">
+              <td colspan="8" class="bg-gray-50 p-4">
                 <div class="rounded-lg border border-gray-200 bg-white p-4">
                   <h3 class="mb-4 text-sm font-semibold text-gray-800">실행 상세 정보</h3>
 
                   <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-                    <div class="rounded border border-gray-200 bg-gray-50 p-3">
+                    <div class="rounded-md bg-gray-50 p-3">
                       <div class="mb-1 text-xs text-gray-500">Log ID</div>
                       <div class="text-sm text-gray-800">
                         {{ h.logId ?? '-' }}
                       </div>
                     </div>
 
-                    <div class="rounded border border-gray-200 bg-gray-50 p-3">
+                    <div class="rounded-md bg-gray-50 p-3">
                       <div class="mb-1 text-xs text-gray-500">Fire Instance ID</div>
                       <div class="break-all text-sm text-gray-800">
                         {{ h.fireInstanceId ?? '-' }}
                       </div>
                     </div>
 
-                    <div class="rounded border border-gray-200 bg-gray-50 p-3">
+                    <div class="rounded-md bg-gray-50 p-3">
                       <div class="mb-1 text-xs text-gray-500">Trigger 그룹</div>
                       <div class="text-sm text-gray-800">
                         {{ h.triggerGroup ?? '-' }}
                       </div>
                     </div>
 
-                    <div class="rounded border border-gray-200 bg-gray-50 p-3">
+                    <div class="rounded-md bg-gray-50 p-3">
                       <div class="mb-1 text-xs text-gray-500">종료시간</div>
                       <div class="text-sm text-gray-800">
                         {{ formatDateTime(h.finishedAt) }}
                       </div>
                     </div>
 
-                    <div class="rounded border border-gray-200 bg-gray-50 p-3">
+                    <div class="rounded-md bg-gray-50 p-3">
                       <div class="mb-1 text-xs text-gray-500">생성시간</div>
                       <div class="text-sm text-gray-800">
                         {{ formatDateTime(h.createdAt) }}
@@ -358,7 +394,7 @@ onMounted(() => {
                     <div class="mb-2 text-sm font-medium text-red-700">예외 메시지</div>
 
                     <div
-                      class="whitespace-pre-wrap break-all rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+                      class="whitespace-pre-wrap break-all rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700"
                     >
                       {{ h.exceptionMessage || '예외 메시지가 없습니다.' }}
                     </div>
@@ -371,13 +407,21 @@ onMounted(() => {
       </table>
     </div>
 
-    <div v-else class="text-gray-500">📭 실행 이력이 없습니다.</div>
+    <!-- 빈 상태 -->
+    <div
+      v-else
+      class="rounded-lg border border-dashed border-gray-300 bg-white px-6 py-12 text-center"
+    >
+      <p class="text-sm font-medium text-gray-700">실행 이력이 없습니다.</p>
+      <p class="mt-1 text-sm text-gray-500">조건을 변경하여 다시 조회해보세요.</p>
+    </div>
 
-    <div v-if="totalCount > 0" class="mt-4 flex items-center justify-center gap-3">
+    <!-- 페이징 -->
+    <div v-if="totalCount > 0" class="flex items-center justify-center gap-2">
       <button
         type="button"
         :disabled="currentPage === 1"
-        class="rounded border border-gray-300 px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-40"
+        class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
         @click="changePage(currentPage - 1)"
       >
         이전
@@ -387,10 +431,10 @@ onMounted(() => {
         v-for="page in visiblePages"
         :key="page"
         type="button"
-        class="min-w-8 rounded border px-3 py-1 text-sm"
+        class="min-w-9 rounded-md border px-3 py-1.5 text-sm"
         :class="
           currentPage === page
-            ? 'border-blue-500 bg-blue-500 text-white'
+            ? 'border-gray-900 bg-gray-900 text-white'
             : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
         "
         @click="changePage(page)"
@@ -401,7 +445,7 @@ onMounted(() => {
       <button
         type="button"
         :disabled="currentPage === totalPages"
-        class="rounded border border-gray-300 px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-40"
+        class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
         @click="changePage(currentPage + 1)"
       >
         다음

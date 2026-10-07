@@ -85,11 +85,10 @@ const addJob = async () => {
     }
 
     // 4. Job 등록 API를 호출한다.
-    const response = await createJob(jobData.value)
+    await createJob(jobData.value)
 
     // 5. 등록 성공 후 목록 화면으로 이동한다.
     alert('Job 등록 성공')
-    console.log(response.data)
 
     router.push('/jobList')
   } catch (error) {
@@ -165,214 +164,292 @@ watch(
 </script>
 
 <template>
-  <div class="p-6 max-w-xl mx-auto">
-    <!-- <h2 class="text-2xl font-bold mb-4">📝 Job 등록</h2> -->
-
-    <form @submit.prevent="addJob" class="space-y-4">
-      <div>
-        <label class="block font-semibold">Job Class Name</label>
-        <select v-model="jobData.jobClassName" class="input">
-          <option value="" disabled>Job 클래스를 선택해주세요.</option>
-
-          <option v-for="jobClass in jobClasses" :key="jobClass" :value="jobClass">
-            {{ getJobClassSimpleName(jobClass) }}
-          </option>
-        </select>
+  <form class="space-y-4" @submit.prevent="addJob">
+    <!-- Job 기본 정보 -->
+    <section class="rounded-lg border border-gray-200 bg-white p-5">
+      <div class="mb-5">
+        <h3 class="text-base font-semibold text-gray-900">Job 기본 정보</h3>
+        <p class="mt-1 text-sm text-gray-500">실행할 Job 클래스와 Job 식별 정보를 설정합니다.</p>
       </div>
 
-      <div>
-        <label class="block font-semibold">Job Name</label>
-        <input v-model="jobData.jobName" class="input" type="text" />
-      </div>
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div class="md:col-span-2">
+          <label class="mb-1 block text-sm font-medium text-gray-700"> Job 클래스 </label>
 
-      <div>
-        <label class="block font-semibold">Job Group</label>
-        <input v-model="jobData.jobGroup" class="input" type="text" />
-      </div>
+          <select
+            v-model="jobData.jobClassName"
+            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
+          >
+            <option value="" disabled>Job 클래스를 선택해주세요.</option>
 
-      <div>
-        <label class="block font-semibold">Schedule Type</label>
-        <select v-model="jobData.scheduleType" class="input">
-          <option value="SIMPLE">SIMPLE</option>
-          <option value="CRON">CRON</option>
-        </select>
-      </div>
-
-      <div>
-        <label class="block font-semibold">Schedule Expression</label>
-        <input v-model="jobData.scheduleExpr" class="input" type="text" />
-
-        <div
-          v-if="jobData.scheduleType === 'CRON'"
-          class="mt-2 rounded border border-gray-200 bg-gray-50 px-3 py-2"
-        >
-          <div class="mb-1 text-xs font-semibold text-gray-600">CRON 예제</div>
-
-          <div class="space-y-1 text-sm text-gray-600">
-            <div class="flex justify-between gap-4">
-              <code class="text-gray-800">0 0/10 * * * ?</code>
-              <span>10분마다 실행</span>
-            </div>
-
-            <div class="flex justify-between gap-4">
-              <code class="text-gray-800">0 0 * * * ?</code>
-              <span>매시 정각 실행</span>
-            </div>
-
-            <div class="flex justify-between gap-4">
-              <code class="text-gray-800">0 0 9 * * ?</code>
-              <span>매일 오전 9시 실행</span>
-            </div>
-
-            <div class="flex justify-between gap-4">
-              <code class="text-gray-800">0 0 9 ? * MON-FRI</code>
-              <span>평일 오전 9시 실행</span>
-            </div>
-          </div>
-        </div>
-
-        <div
-          v-else-if="jobData.scheduleType === 'SIMPLE'"
-          class="mt-2 rounded border border-gray-200 bg-gray-50 px-3 py-2"
-        >
-          <div class="mb-1 text-xs font-semibold text-gray-600">SIMPLE 예제</div>
-
-          <div class="space-y-1 text-sm text-gray-600">
-            <div class="flex justify-between gap-4">
-              <code class="text-gray-800">10</code>
-              <span>10초마다 실행</span>
-            </div>
-
-            <div class="flex justify-between gap-4">
-              <code class="text-gray-800">60</code>
-              <span>1분마다 실행</span>
-            </div>
-
-            <div class="flex justify-between gap-4">
-              <code class="text-gray-800">300</code>
-              <span>5분마다 실행</span>
-            </div>
-
-            <div class="flex justify-between gap-4">
-              <code class="text-gray-800">3600</code>
-              <span>1시간마다 실행</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div>
-        <label class="block font-semibold">Misfire Policy</label>
-
-        <select v-model="jobData.misfirePolicy" class="input">
-          <template v-if="jobData.scheduleType === 'CRON'">
-            <option value="SMART_POLICY">기본 정책</option>
-            <option value="FIRE_AND_PROCEED">놓친 실행이 있으면 즉시 1회 실행</option>
-            <option value="DO_NOTHING">놓친 실행은 건너뛰기</option>
-          </template>
-
-          <template v-else-if="jobData.scheduleType === 'SIMPLE'">
-            <option value="SMART_POLICY">기본 정책</option>
-            <option value="FIRE_NOW">즉시 실행</option>
-            <option value="NOW_WITH_EXISTING_COUNT">즉시 실행 - 기존 반복 횟수 기준</option>
-            <option value="NOW_WITH_REMAINING_COUNT">즉시 실행 - 남은 반복 횟수 기준</option>
-            <option value="NEXT_WITH_EXISTING_COUNT">다음 실행 - 기존 반복 횟수 기준</option>
-            <option value="NEXT_WITH_REMAINING_COUNT">다음 실행 - 남은 반복 횟수 기준</option>
-          </template>
-        </select>
-
-        <div class="mt-1 text-sm text-gray-500">
-          예정된 실행 시간을 놓쳤을 때 Quartz가 처리하는 방식을 선택합니다.
-        </div>
-      </div>
-
-      <!-- ExternalApiCallJob 선택 시 -->
-      <fieldset
-        v-if="isExternalApiCallJob(jobData.jobClassName)"
-        class="border border-gray-300 p-4 rounded"
-      >
-        <legend class="font-bold">External API</legend>
-
-        <div>
-          <label class="block font-semibold">External API 선택</label>
-
-          <select v-model="selectedExternalApiId" class="input">
-            <option value="" disabled>External API를 선택해주세요.</option>
-
-            <option
-              v-for="externalApi in externalApiList"
-              :key="externalApi.externalApiId"
-              :value="externalApi.externalApiId"
-            >
-              {{ externalApi.apiName }}
+            <option v-for="jobClass in jobClasses" :key="jobClass" :value="jobClass">
+              {{ getJobClassSimpleName(jobClass) }}
             </option>
           </select>
         </div>
 
-        <div v-if="externalApiList.length === 0" class="mt-2 text-sm text-gray-500">
-          등록된 External API가 없습니다.
+        <div>
+          <label class="mb-1 block text-sm font-medium text-gray-700"> Job 이름 </label>
+
+          <input
+            v-model="jobData.jobName"
+            type="text"
+            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
+          />
         </div>
-      </fieldset>
 
-      <!-- 그 외 일반 Job 선택 시 기존 params UI -->
-      <fieldset v-else class="border border-gray-300 p-4 rounded">
-        <legend class="font-bold">파라미터 (params)</legend>
+        <div>
+          <label class="mb-1 block text-sm font-medium text-gray-700"> Job 그룹 </label>
 
+          <input
+            v-model="jobData.jobGroup"
+            type="text"
+            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
+          />
+        </div>
+      </div>
+    </section>
+
+    <!-- 스케줄 설정 -->
+    <section class="rounded-lg border border-gray-200 bg-white p-5">
+      <div class="mb-5">
+        <h3 class="text-base font-semibold text-gray-900">스케줄 설정</h3>
+        <p class="mt-1 text-sm text-gray-500">Job 실행 주기와 Misfire 처리 방식을 설정합니다.</p>
+      </div>
+
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div>
+          <label class="mb-1 block text-sm font-medium text-gray-700"> 스케줄 유형 </label>
+
+          <select
+            v-model="jobData.scheduleType"
+            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
+          >
+            <option value="SIMPLE">SIMPLE</option>
+            <option value="CRON">CRON</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="mb-1 block text-sm font-medium text-gray-700"> Misfire Policy </label>
+
+          <select
+            v-model="jobData.misfirePolicy"
+            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
+          >
+            <template v-if="jobData.scheduleType === 'CRON'">
+              <option value="SMART_POLICY">기본 정책</option>
+              <option value="FIRE_AND_PROCEED">놓친 실행이 있으면 즉시 1회 실행</option>
+              <option value="DO_NOTHING">놓친 실행은 건너뛰기</option>
+            </template>
+
+            <template v-else>
+              <option value="SMART_POLICY">기본 정책</option>
+              <option value="FIRE_NOW">즉시 실행</option>
+              <option value="NOW_WITH_EXISTING_COUNT">즉시 실행 - 기존 반복 횟수 기준</option>
+              <option value="NOW_WITH_REMAINING_COUNT">즉시 실행 - 남은 반복 횟수 기준</option>
+              <option value="NEXT_WITH_EXISTING_COUNT">다음 실행 - 기존 반복 횟수 기준</option>
+              <option value="NEXT_WITH_REMAINING_COUNT">다음 실행 - 남은 반복 횟수 기준</option>
+            </template>
+          </select>
+
+          <p class="mt-1 text-xs text-gray-500">
+            예정된 실행 시간을 놓쳤을 때 Quartz가 처리하는 방식입니다.
+          </p>
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="mb-1 block text-sm font-medium text-gray-700"> 스케줄 표현식 </label>
+
+          <input
+            v-model="jobData.scheduleExpr"
+            type="text"
+            :placeholder="
+              jobData.scheduleType === 'CRON' ? '예: 0 0/10 * * * ?' : '반복 간격을 초 단위로 입력'
+            "
+            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
+          />
+
+          <!-- CRON 예제 -->
+          <div
+            v-if="jobData.scheduleType === 'CRON'"
+            class="mt-3 rounded-md border border-gray-200 bg-gray-50 p-4"
+          >
+            <div class="mb-2 text-xs font-semibold text-gray-600">CRON 예제</div>
+
+            <div class="space-y-2 text-sm text-gray-600">
+              <div class="flex flex-wrap justify-between gap-2">
+                <code class="text-gray-800">0 0/10 * * * ?</code>
+                <span>10분마다 실행</span>
+              </div>
+
+              <div class="flex flex-wrap justify-between gap-2">
+                <code class="text-gray-800">0 0 * * * ?</code>
+                <span>매시 정각 실행</span>
+              </div>
+
+              <div class="flex flex-wrap justify-between gap-2">
+                <code class="text-gray-800">0 0 9 * * ?</code>
+                <span>매일 오전 9시 실행</span>
+              </div>
+
+              <div class="flex flex-wrap justify-between gap-2">
+                <code class="text-gray-800">0 0 9 ? * MON-FRI</code>
+                <span>평일 오전 9시 실행</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- SIMPLE 예제 -->
+          <div v-else class="mt-3 rounded-md border border-gray-200 bg-gray-50 p-4">
+            <div class="mb-2 text-xs font-semibold text-gray-600">SIMPLE 예제</div>
+
+            <div class="space-y-2 text-sm text-gray-600">
+              <div class="flex justify-between gap-2">
+                <code class="text-gray-800">10</code>
+                <span>10초마다 실행</span>
+              </div>
+
+              <div class="flex justify-between gap-2">
+                <code class="text-gray-800">60</code>
+                <span>1분마다 실행</span>
+              </div>
+
+              <div class="flex justify-between gap-2">
+                <code class="text-gray-800">300</code>
+                <span>5분마다 실행</span>
+              </div>
+
+              <div class="flex justify-between gap-2">
+                <code class="text-gray-800">3600</code>
+                <span>1시간마다 실행</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- External API -->
+    <section
+      v-if="isExternalApiCallJob(jobData.jobClassName)"
+      class="rounded-lg border border-gray-200 bg-white p-5"
+    >
+      <div class="mb-5">
+        <h3 class="text-base font-semibold text-gray-900">API 연계</h3>
+        <p class="mt-1 text-sm text-gray-500">해당 Job에서 호출할 API를 선택합니다.</p>
+      </div>
+
+      <div>
+        <label class="mb-1 block text-sm font-medium text-gray-700"> 호출 API </label>
+
+        <select
+          v-model="selectedExternalApiId"
+          class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
+        >
+          <option value="" disabled>호출할 API를 선택해주세요.</option>
+
+          <option
+            v-for="externalApi in externalApiList"
+            :key="externalApi.externalApiId"
+            :value="externalApi.externalApiId"
+          >
+            {{ externalApi.apiName }}
+          </option>
+        </select>
+      </div>
+
+      <div
+        v-if="externalApiList.length === 0"
+        class="mt-4 rounded-md border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500"
+      >
+        등록된 API가 없습니다.
+      </div>
+    </section>
+
+    <!-- 일반 Job 파라미터 -->
+    <section v-else class="rounded-lg border border-gray-200 bg-white p-5">
+      <div class="mb-5 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 class="text-base font-semibold text-gray-900">실행 파라미터</h3>
+          <p class="mt-1 text-sm text-gray-500">
+            Job 실행 시 전달할 Key / Value 파라미터를 설정합니다.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          @click="addParam"
+        >
+          파라미터 추가
+        </button>
+      </div>
+
+      <div
+        v-if="paramList.length === 0"
+        class="rounded-md border border-dashed border-gray-300 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500"
+      >
+        등록된 파라미터가 없습니다.
+      </div>
+
+      <div v-else class="space-y-3">
         <div
           v-for="(param, index) in paramList"
           :key="index"
-          class="grid grid-cols-[1fr_1fr_auto] gap-2 items-end mb-3"
+          class="rounded-lg border border-gray-200 bg-gray-50 p-4"
         >
-          <div>
-            <label class="block font-semibold">Key</label>
-            <input v-model="param.key" class="input" type="text" placeholder="예: baseDate" />
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-[1fr_1fr_auto] md:items-end">
+            <div>
+              <label class="mb-1 block text-sm font-medium text-gray-700"> Key </label>
+
+              <input
+                v-model="param.key"
+                type="text"
+                placeholder="예: baseDate"
+                class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-gray-500"
+              />
+            </div>
+
+            <div>
+              <label class="mb-1 block text-sm font-medium text-gray-700"> Value </label>
+
+              <input
+                v-model="param.value"
+                type="text"
+                placeholder="값"
+                class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-gray-500"
+              />
+            </div>
+
+            <button
+              type="button"
+              class="rounded-md px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+              @click="removeParam(index)"
+            >
+              삭제
+            </button>
           </div>
-
-          <div>
-            <label class="block font-semibold">Value</label>
-            <input v-model="param.value" class="input" type="text" placeholder="값" />
-          </div>
-
-          <button
-            type="button"
-            @click="removeParam(index)"
-            class="border border-red-300 text-red-600 px-3 py-2 rounded hover:bg-red-50"
-          >
-            삭제
-          </button>
         </div>
-
-        <div v-if="paramList.length === 0" class="text-sm text-gray-500 mb-3">
-          등록된 파라미터가 없습니다. 필요한 경우 파라미터를 추가해주세요.
-        </div>
-
-        <button
-          type="button"
-          @click="addParam"
-          class="border border-gray-300 px-3 py-2 rounded hover:bg-gray-100"
-        >
-          + 파라미터 추가
-        </button>
-      </fieldset>
-
-      <div class="flex justify-center gap-2">
-        <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
-          등록하기
-        </button>
-        <button
-          type="button"
-          @click="router.push('/jobList')"
-          class="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
-        >
-          취소
-        </button>
       </div>
-    </form>
-  </div>
-</template>
+    </section>
 
-<style scoped>
-.input {
-  @apply w-full border border-gray-300 px-3 py-2 rounded mt-1;
-}
-</style>
+    <!-- 하단 버튼 -->
+    <div class="flex justify-end gap-2">
+      <button
+        type="button"
+        class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        @click="router.push('/jobList')"
+      >
+        취소
+      </button>
+
+      <button
+        type="submit"
+        class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
+      >
+        등록
+      </button>
+    </div>
+  </form>
+</template>

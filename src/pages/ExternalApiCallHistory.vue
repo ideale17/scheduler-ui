@@ -197,27 +197,27 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="flex min-h-full flex-col p-4">
+  <div class="space-y-4">
     <!-- 검색조건 -->
-    <div class="mb-4 rounded border border-gray-200 bg-white p-4">
-      <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
+    <div class="rounded-lg border border-gray-200 bg-white p-4">
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <div>
-          <label class="mb-1 block text-sm font-medium text-gray-700"> API명 </label>
+          <label class="mb-1 block text-sm font-medium text-gray-700">API명</label>
 
           <input
             v-model="searchCondition.apiName"
             type="text"
-            class="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
             placeholder="API명"
           />
         </div>
 
         <div>
-          <label class="mb-1 block text-sm font-medium text-gray-700"> 호출 상태 </label>
+          <label class="mb-1 block text-sm font-medium text-gray-700">호출 상태</label>
 
           <select
             v-model="searchCondition.status"
-            class="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
           >
             <option value="">전체</option>
             <option value="SUCCESS">성공</option>
@@ -227,30 +227,30 @@ onMounted(() => {
         </div>
 
         <div>
-          <label class="mb-1 block text-sm font-medium text-gray-700"> 시작일 </label>
+          <label class="mb-1 block text-sm font-medium text-gray-700">시작일</label>
 
           <input
             v-model="searchCondition.startDate"
             type="date"
-            class="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
           />
         </div>
 
         <div>
-          <label class="mb-1 block text-sm font-medium text-gray-700"> 종료일 </label>
+          <label class="mb-1 block text-sm font-medium text-gray-700">종료일</label>
 
           <input
             v-model="searchCondition.endDate"
             type="date"
-            class="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
           />
         </div>
       </div>
 
-      <div class="mt-3 flex justify-end gap-2">
+      <div class="mt-4 flex justify-end gap-2">
         <button
           type="button"
-          class="rounded bg-gray-500 px-4 py-2 text-sm text-white hover:bg-gray-600"
+          class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
           @click="resetSearchCondition"
         >
           초기화
@@ -258,7 +258,7 @@ onMounted(() => {
 
         <button
           type="button"
-          class="rounded bg-blue-500 px-4 py-2 text-sm text-white hover:bg-blue-600"
+          class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
           @click="searchCallHistory"
         >
           조회
@@ -266,77 +266,98 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- 호출 이력 목록 -->
-    <div v-if="historyList.length > 0" class="min-h-[420px] overflow-x-auto">
-      <table class="w-full border border-gray-300 text-sm">
-        <thead class="bg-gray-100">
+    <!-- 호출 이력 -->
+    <div
+      v-if="historyList.length > 0"
+      class="min-h-[420px] overflow-x-auto rounded-lg border border-gray-200 bg-white"
+    >
+      <table class="w-full text-sm">
+        <thead class="border-b border-gray-200 bg-gray-50">
           <tr>
-            <th class="border px-2 py-1">API명</th>
-            <th class="border px-2 py-1">시작시간</th>
-            <th class="border px-2 py-1">상태</th>
-            <th class="border px-2 py-1">요청횟수</th>
-            <th class="border px-2 py-1">재시도</th>
-            <th class="border px-2 py-1">전체시간</th>
-            <th class="border px-2 py-1">API시간</th>
-            <th class="border px-2 py-1">실행 구분</th>
-            <th class="border px-2 py-1">상세</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500">
+              API명
+            </th>
+            <th class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500">
+              시작시간
+            </th>
+            <th class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500">
+              상태
+            </th>
+            <th class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500">
+              요청횟수
+            </th>
+            <th class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500">
+              재시도
+            </th>
+            <th class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500">
+              전체시간
+            </th>
+            <th class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500">
+              API시간
+            </th>
+            <th class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500">
+              실행 구분
+            </th>
+            <th class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500">
+              상세
+            </th>
           </tr>
         </thead>
 
-        <tbody>
+        <tbody class="divide-y divide-gray-100">
           <template v-for="history in historyList" :key="history.executionId">
-            <tr>
-              <td class="border px-2 py-1">
+            <tr class="transition-colors hover:bg-gray-50">
+              <td class="px-4 py-3 text-center font-medium text-gray-900">
                 {{ history.apiName || `API #${history.externalApiId}` }}
               </td>
 
-              <td class="border px-2 py-1">
+              <td class="whitespace-nowrap px-4 py-3 text-center text-gray-600">
                 {{ formatDateTime(history.startedAt) }}
               </td>
 
-              <td class="border px-2 py-1 text-center">
+              <td class="px-4 py-3 text-center">
                 <span
                   v-if="history.status === 'SUCCESS'"
-                  class="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700"
+                  class="inline-flex rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700"
                 >
                   성공
                 </span>
 
                 <span
                   v-else-if="history.status === 'FAILED'"
-                  class="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700"
+                  class="inline-flex rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700"
                 >
                   실패
                 </span>
 
                 <span
                   v-else
-                  class="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700"
+                  class="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700"
                 >
                   {{ history.status }}
                 </span>
               </td>
 
-              <td class="border px-2 py-1 text-center">{{ history.requestCount }}회</td>
+              <td class="px-4 py-3 text-center text-gray-600">{{ history.requestCount }}회</td>
 
-              <td class="border px-2 py-1 text-center">{{ history.retryCount }}회</td>
+              <td class="px-4 py-3 text-center text-gray-600">{{ history.retryCount }}회</td>
 
-              <td class="border px-2 py-1">
+              <td class="whitespace-nowrap px-4 py-3 text-center text-gray-600">
                 {{ formatRunMillis(history.totalRunMillis) }}
               </td>
 
-              <td class="border px-2 py-1">
+              <td class="whitespace-nowrap px-4 py-3 text-center text-gray-600">
                 {{ formatRunMillis(history.apiRunMillis) }}
               </td>
 
-              <td class="border px-2 py-1 text-center">
+              <td class="px-4 py-3 text-center text-gray-600">
                 {{ getExecutionType(history.fireInstanceId) }}
               </td>
 
-              <td class="border px-2 py-1 text-center">
+              <td class="px-4 py-3 text-center">
                 <button
                   type="button"
-                  class="rounded border border-gray-300 bg-white px-3 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                  class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
                   @click="toggleHistoryDetail(history.executionId)"
                 >
                   {{ selectedHistoryId === history.executionId ? '닫기' : '상세' }}
@@ -346,80 +367,113 @@ onMounted(() => {
 
             <!-- 상세 -->
             <tr v-if="selectedHistoryId === history.executionId">
-              <td colspan="9" class="border bg-gray-50 p-4">
-                <!-- External API 전체 실행 실패 사유 -->
+              <td colspan="9" class="bg-gray-50 p-4">
                 <div
                   v-if="history.status === 'FAILED' && history.errorMessage"
-                  class="mb-4 rounded border border-red-200 bg-red-50 p-3"
+                  class="mb-4 rounded-md border border-red-200 bg-red-50 p-3"
                 >
                   <div class="mb-1 text-sm font-semibold text-red-700">실행 실패 사유</div>
 
-                  <div class="text-sm text-red-700">
+                  <div class="break-all text-sm text-red-700">
                     {{ history.errorMessage }}
                   </div>
                 </div>
 
-                <div class="mt-4 border-t border-gray-200 pt-4">
+                <div class="rounded-lg border border-gray-200 bg-white p-4">
                   <h4 class="mb-3 text-sm font-semibold text-gray-800">호출 시도 이력</h4>
 
-                  <div v-if="detailLoading" class="text-sm text-gray-500">조회 중...</div>
+                  <div v-if="detailLoading" class="py-4 text-sm text-gray-500">
+                    호출 이력을 불러오는 중입니다.
+                  </div>
 
-                  <table
+                  <div
                     v-else-if="detailList.length > 0"
-                    class="w-full border border-gray-300 text-sm"
+                    class="overflow-x-auto rounded-md border border-gray-200"
                   >
-                    <thead class="bg-gray-100">
-                      <tr>
-                        <th class="border px-2 py-1">요청순번</th>
-                        <th class="border px-2 py-1">호출 구분</th>
-                        <th class="border px-2 py-1">상태</th>
-                        <th class="border px-2 py-1">HTTP</th>
-                        <th class="border px-2 py-1">시작시간</th>
-                        <th class="border px-2 py-1">호출시간</th>
-                        <th class="border px-2 py-1">오류</th>
-                      </tr>
-                    </thead>
+                    <table class="w-full text-sm">
+                      <thead class="border-b border-gray-200 bg-gray-50">
+                        <tr>
+                          <th class="px-3 py-2 text-center text-xs font-semibold text-gray-500">
+                            요청순번
+                          </th>
+                          <th class="px-3 py-2 text-center text-xs font-semibold text-gray-500">
+                            호출 구분
+                          </th>
+                          <th class="px-3 py-2 text-center text-xs font-semibold text-gray-500">
+                            상태
+                          </th>
+                          <th class="px-3 py-2 text-center text-xs font-semibold text-gray-500">
+                            HTTP
+                          </th>
+                          <th class="px-3 py-2 text-center text-xs font-semibold text-gray-500">
+                            시작시간
+                          </th>
+                          <th class="px-3 py-2 text-center text-xs font-semibold text-gray-500">
+                            호출시간
+                          </th>
+                          <th class="px-3 py-2 text-center text-xs font-semibold text-gray-500">
+                            오류
+                          </th>
+                        </tr>
+                      </thead>
 
-                    <tbody>
-                      <tr v-for="detail in detailList" :key="detail.apiCallLogId">
-                        <td class="border px-2 py-1 text-center">
-                          {{ detail.requestSequence }}
-                        </td>
+                      <tbody class="divide-y divide-gray-100">
+                        <tr
+                          v-for="detail in detailList"
+                          :key="detail.apiCallLogId"
+                          class="hover:bg-gray-50"
+                        >
+                          <td class="px-3 py-2 text-center text-gray-600">
+                            {{ detail.requestSequence }}
+                          </td>
 
-                        <td class="border px-2 py-1 text-center">
-                          {{
-                            detail.attemptNo === 1 ? '최초 호출' : `재시도 ${detail.attemptNo - 1}`
-                          }}
-                        </td>
+                          <td class="px-3 py-2 text-center text-gray-600">
+                            {{
+                              detail.attemptNo === 1
+                                ? '최초 호출'
+                                : `재시도 ${detail.attemptNo - 1}`
+                            }}
+                          </td>
 
-                        <td class="border px-2 py-1 text-center">
-                          <span v-if="detail.status === 'SUCCESS'" class="text-green-700">
-                            성공
-                          </span>
+                          <td class="px-3 py-2 text-center">
+                            <span
+                              v-if="detail.status === 'SUCCESS'"
+                              class="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700"
+                            >
+                              성공
+                            </span>
 
-                          <span v-else class="text-red-700">실패</span>
-                        </td>
+                            <span
+                              v-else
+                              class="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700"
+                            >
+                              실패
+                            </span>
+                          </td>
 
-                        <td class="border px-2 py-1 text-center">
-                          {{ detail.httpStatus ?? '-' }}
-                        </td>
+                          <td class="px-3 py-2 text-center text-gray-600">
+                            {{ detail.httpStatus ?? '-' }}
+                          </td>
 
-                        <td class="border px-2 py-1">
-                          {{ formatDateTime(detail.startedAt) }}
-                        </td>
+                          <td class="whitespace-nowrap px-3 py-2 text-center text-gray-600">
+                            {{ formatDateTime(detail.startedAt) }}
+                          </td>
 
-                        <td class="border px-2 py-1">
-                          {{ formatRunMillis(detail.runMillis) }}
-                        </td>
+                          <td class="whitespace-nowrap px-3 py-2 text-center text-gray-600">
+                            {{ formatRunMillis(detail.runMillis) }}
+                          </td>
 
-                        <td class="border px-2 py-1">
-                          {{ detail.errorMessage || '-' }}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                          <td class="max-w-xs px-3 py-2 text-gray-600">
+                            <div class="truncate" :title="detail.errorMessage || ''">
+                              {{ detail.errorMessage || '-' }}
+                            </div>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
 
-                  <div v-else class="text-sm text-gray-500">호출 시도 이력이 없습니다.</div>
+                  <div v-else class="py-4 text-sm text-gray-500">호출 시도 이력이 없습니다.</div>
                 </div>
               </td>
             </tr>
@@ -428,14 +482,22 @@ onMounted(() => {
       </table>
     </div>
 
-    <div v-else class="text-gray-500">📭 External API 호출 이력이 없습니다.</div>
+    <!-- 빈 상태 -->
+    <div
+      v-else
+      class="rounded-lg border border-dashed border-gray-300 bg-white px-6 py-12 text-center"
+    >
+      <p class="text-sm font-medium text-gray-700">External API 호출 이력이 없습니다.</p>
+
+      <p class="mt-1 text-sm text-gray-500">조건을 변경하여 다시 조회해보세요.</p>
+    </div>
 
     <!-- 페이징 -->
-    <div v-if="totalCount > 0" class="mt-4 flex items-center justify-center gap-3">
+    <div v-if="totalCount > 0" class="flex items-center justify-center gap-2">
       <button
         type="button"
         :disabled="currentPage === 1"
-        class="rounded border border-gray-300 px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-40"
+        class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
         @click="changePage(currentPage - 1)"
       >
         이전
@@ -445,10 +507,10 @@ onMounted(() => {
         v-for="page in visiblePages"
         :key="page"
         type="button"
-        class="min-w-8 rounded border px-3 py-1 text-sm"
+        class="min-w-9 rounded-md border px-3 py-1.5 text-sm"
         :class="
           currentPage === page
-            ? 'border-blue-500 bg-blue-500 text-white'
+            ? 'border-gray-900 bg-gray-900 text-white'
             : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
         "
         @click="changePage(page)"
@@ -459,7 +521,7 @@ onMounted(() => {
       <button
         type="button"
         :disabled="currentPage === totalPages"
-        class="rounded border border-gray-300 px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-40"
+        class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
         @click="changePage(currentPage + 1)"
       >
         다음
