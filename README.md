@@ -1,35 +1,55 @@
-# scheduler-ui
+# Scheduler UI
 
-This template should help get you started developing with Vue 3 in Vite.
+Quartz 기반 동적 스케줄 관리 시스템의 관리자 웹 UI입니다.
 
-## Recommended IDE Setup
+Spring Boot 기반 Scheduler API와 연동하여 스케줄 등록·수정·실행 상태 조회와 외부 API 관리 기능을 제공합니다.
 
-[VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+## 주요 기능
 
-## Customize configuration
+- Dashboard
+- Job 등록 / 수정 / 삭제
+- Job 중지 / 재개
+- Job 실행 이력 조회
+- 외부 API 등록 / 수정 / 삭제
+- 외부 API 실행 및 호출 이력 조회
+- 수집 데이터 조회
+- 로그인 / 회원가입
+- 회원가입 활성화 여부에 따른 UI 제어
 
-See [Vite Configuration Reference](https://vite.dev/config/).
+## Tech Stack
+
+- Vue 3
+- Vite
+- Vue Router
+- Axios
+- Tailwind CSS
+
+## Backend
+
+Backend repository:
+
+- [spring-quartz-scheduler](https://github.com/ideale17/spring-quartz-scheduler)
 
 ## Project Setup
 
-```sh
+```bash
 npm install
 ```
 
-### Compile and Hot-Reload for Development
+### Development
 
-```sh
+```bash
 npm run dev
 ```
 
-### Compile and Minify for Production
+### Production Build
 
-```sh
+```bash
 npm run build
 ```
 
-### Lint with [ESLint](https://eslint.org/)
+### Lint
 
-```sh
+```bash
 npm run lint
 ```
