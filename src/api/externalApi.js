@@ -1,11 +1,11 @@
 import http from './http'
 
 export const getExternalApiList = () => {
-  return http.get('/externalApi/list')
+  return http.get('/external-api/list')
 }
 
 export const getExternalApi = (externalApiId) => {
-  return http.get('/externalApi/detail', {
+  return http.get('/external-api/detail', {
     params: {
       externalApiId,
     },
@@ -13,7 +13,7 @@ export const getExternalApi = (externalApiId) => {
 }
 
 export const getExternalApiParams = (externalApiId) => {
-  return http.get('/externalApi/params', {
+  return http.get('/external-api/params', {
     params: {
       externalApiId,
     },
@@ -22,7 +22,7 @@ export const getExternalApiParams = (externalApiId) => {
 
 // External API 페이징 설정 조회
 export const getExternalApiPaging = (externalApiId) => {
-  return http.get('/externalApi/paging', {
+  return http.get('/external-api/paging', {
     params: {
       externalApiId,
     },
@@ -30,7 +30,7 @@ export const getExternalApiPaging = (externalApiId) => {
 }
 
 export const executeExternalApi = (externalApiId) => {
-  return http.post('/externalApi/execute', null, {
+  return http.post('/external-api/execute', null, {
     params: {
       externalApiId,
     },
@@ -38,20 +38,12 @@ export const executeExternalApi = (externalApiId) => {
 }
 
 export const createExternalApi = (requestData) => {
-  return http.post('/externalApi/add', requestData)
-}
-
-export const updateExternalApi = (externalApiId, requestData) => {
-  return http.put('/externalApi/update', requestData, {
-    params: {
-      externalApiId,
-    },
-  })
+  return http.post('/external-api/add', requestData)
 }
 
 // External API 기본 정보 수정
 export const updateExternalApiBasic = (externalApiId, basic) => {
-  return http.put('/externalApi/basic', basic, {
+  return http.put('/external-api/basic', basic, {
     params: {
       externalApiId,
     },
@@ -60,7 +52,7 @@ export const updateExternalApiBasic = (externalApiId, basic) => {
 
 // External API 인증 정보 수정
 export const updateExternalApiAuth = (externalApiId, auth) => {
-  return http.put('/externalApi/auth', auth, {
+  return http.put('/external-api/auth', auth, {
     params: {
       externalApiId,
     },
@@ -69,7 +61,7 @@ export const updateExternalApiAuth = (externalApiId, auth) => {
 
 // External API 파라미터 수정
 export const updateExternalApiParams = (externalApiId, params) => {
-  return http.put('/externalApi/params', params, {
+  return http.put('/external-api/params', params, {
     params: {
       externalApiId,
     },
@@ -78,7 +70,7 @@ export const updateExternalApiParams = (externalApiId, params) => {
 
 // External API 페이징 설정 저장
 export const saveExternalApiPaging = (externalApiId, paging) => {
-  return http.put('/externalApi/paging', paging, {
+  return http.put('/external-api/paging', paging, {
     params: {
       externalApiId,
     },
@@ -86,7 +78,7 @@ export const saveExternalApiPaging = (externalApiId, paging) => {
 }
 
 export const deleteExternalApi = (externalApiId) => {
-  return http.delete('/externalApi/delete', {
+  return http.delete('/external-api/delete', {
     params: {
       externalApiId,
     },
@@ -95,7 +87,7 @@ export const deleteExternalApi = (externalApiId) => {
 
 // External API 페이징 설정 삭제
 export const deleteExternalApiPaging = (externalApiId) => {
-  return http.delete('/externalApi/paging', {
+  return http.delete('/external-api/paging', {
     params: {
       externalApiId,
     },

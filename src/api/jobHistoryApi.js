@@ -1,5 +1,5 @@
 import http from './http'
 
 export const getJobHistory = (params) => {
-  return http.get('/jobs/historyJobs', { params })
+  return http.get('/jobs/history', { params })
 }
