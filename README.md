@@ -30,6 +30,20 @@ Backend repository:
 
 - [spring-quartz-scheduler](https://github.com/ideale17/spring-quartz-scheduler)
 
+## Screenshots
+
+### Dashboard
+
+![Dashboard](docs/images/dashboard.png)
+
+### Job Management
+
+![Job Management](docs/images/job-list.png)
+
+### External API Management
+
+![External API Management](docs/images/external-api.png)
+
 ## Project Setup
 
 ```bash
