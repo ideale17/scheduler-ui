@@ -248,19 +248,14 @@ onMounted(() => {
   <div class="space-y-4">
     <!-- 상단 작업 영역 -->
     <div class="flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <div class="text-sm font-medium text-gray-700">Job 목록</div>
-        <div class="mt-1 text-sm text-gray-500">
-          등록된 Job을 조회하고 실행, 시작, 중지할 수 있습니다.
-        </div>
-      </div>
+      <div class="text-sm text-gray-500">등록된 Job을 조회하고 실행, 시작, 중지할 수 있습니다.</div>
 
       <button
         type="button"
         class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
         @click="router.push('/add')"
       >
-        새 Job 등록
+        Job 등록
       </button>
     </div>
 
@@ -277,32 +272,54 @@ onMounted(() => {
       </div>
 
       <div class="flex items-center gap-2">
-        <button
-          type="button"
-          :disabled="selectedJobKeys.length === 0"
-          class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-          @click="runSelectedJobs"
-        >
-          즉시 실행
-        </button>
+        <div class="group relative">
+          <button
+            type="button"
+            :disabled="selectedJobKeys.length === 0"
+            class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+            @click="runSelectedJobs"
+          >
+            즉시 실행
+          </button>
 
-        <button
-          type="button"
-          :disabled="selectedJobKeys.length === 0"
-          class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-          @click="resumeSelectedJobs"
-        >
-          시작
-        </button>
+          <div
+            class="pointer-events-none absolute right-0 top-full z-10 mt-2 hidden w-64 rounded-md bg-gray-900 px-3 py-2 text-xs leading-5 text-white shadow-lg group-hover:block"
+          >
+            선택한 Job을 1회 실행하고 기존 스케줄은 유지합니다.
+          </div>
+        </div>
+        <div class="group relative">
+          <button
+            type="button"
+            :disabled="selectedJobKeys.length === 0"
+            class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+            @click="resumeSelectedJobs"
+          >
+            시작
+          </button>
 
-        <button
-          type="button"
-          :disabled="selectedJobKeys.length === 0"
-          class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-          @click="pauseSelectedJobs"
-        >
-          중지
-        </button>
+          <div
+            class="pointer-events-none absolute right-0 top-full z-10 mt-2 hidden w-64 rounded-md bg-gray-900 px-3 py-2 text-xs leading-5 text-white shadow-lg group-hover:block"
+          >
+            중지된 Job의 스케줄 실행을 다시 활성화합니다.
+          </div>
+        </div>
+
+        <div class="group relative">
+          <button
+            type="button"
+            :disabled="selectedJobKeys.length === 0"
+            class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+            @click="pauseSelectedJobs"
+          >
+            중지
+          </button>
+          <div
+            class="pointer-events-none absolute right-0 top-full z-10 mt-2 hidden w-64 rounded-md bg-gray-900 px-3 py-2 text-xs leading-5 text-white shadow-lg group-hover:block"
+          >
+            선택한 Job의 스케줄 실행을 중지합니다.
+          </div>
+        </div>
       </div>
     </div>
 

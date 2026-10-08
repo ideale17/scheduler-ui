@@ -74,12 +74,7 @@ onMounted(() => {
   <div class="space-y-4">
     <!-- 상단 작업 영역 -->
     <div class="flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <div class="text-sm font-medium text-gray-700">External API 목록</div>
-        <div class="mt-1 text-sm text-gray-500">
-          등록된 External API의 설정과 실행 상태를 관리합니다.
-        </div>
-      </div>
+      <div class="text-sm text-gray-500">등록된 External API의 설정과 실행 상태를 관리합니다.</div>
 
       <button
         type="button"
