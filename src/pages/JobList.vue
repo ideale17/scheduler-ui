@@ -12,6 +12,7 @@ import {
 const router = useRouter()
 const jobList = ref([])
 const selectedJobKeys = ref([])
+const isRefreshing = ref(false)
 
 const getJobKey = (job) => {
   return `${job.jobGroup}:${job.jobName}`
@@ -45,6 +46,21 @@ const fetchJobList = async () => {
   } catch (error) {
     console.error('목록 불러오기 실패:', error)
     jobList.value = []
+  }
+}
+
+const refreshJobList = async () => {
+  if (isRefreshing.value) return
+
+  isRefreshing.value = true
+
+  try {
+    await fetchJobList()
+    selectedJobKeys.value = selectedJobKeys.value.filter((key) =>
+      jobList.value.some((job) => getJobKey(job) === key),
+    )
+  } finally {
+    isRefreshing.value = false
   }
 }
 
@@ -250,13 +266,24 @@ onMounted(() => {
     <div class="flex flex-wrap items-end justify-between gap-4">
       <div class="text-sm text-gray-500">등록된 Job을 조회하고 실행, 시작, 중지할 수 있습니다.</div>
 
-      <button
-        type="button"
-        class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
-        @click="router.push('/add')"
-      >
-        Job 등록
-      </button>
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          :disabled="isRefreshing"
+          class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+          @click="refreshJobList"
+        >
+          {{ isRefreshing ? '조회 중...' : '재조회' }}
+        </button>
+
+        <button
+          type="button"
+          class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
+          @click="router.push('/add')"
+        >
+          Job 등록
+        </button>
+      </div>
     </div>
 
     <!-- 선택 작업 -->
