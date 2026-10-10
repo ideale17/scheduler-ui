@@ -14,6 +14,8 @@ import ExternalApiAdd from '@/pages/ExternalApiAdd.vue'
 import ExternalApiDetail from '@/pages/ExternalApiDetail.vue'
 import ExternalApiEdit from '@/pages/ExternalApiEdit.vue'
 import ExternalApiCallHistory from '@/pages/ExternalApiCallHistory.vue'
+import RawDataList from '@/pages/RawDataList.vue'
+import RawDataDetail from '@/pages/RawDataDetail.vue'
 
 const routes = [
   { path: '/login', component: LoginView, meta: { requiresAuth: false, public: true } },
@@ -76,6 +78,22 @@ const routes = [
         component: ExternalApiEdit,
         meta: {
           title: 'API 수정',
+          requiresAuth: true,
+        },
+      },
+      {
+        path: 'raw-data',
+        component: RawDataList,
+        meta: {
+          title: 'Raw Data 관리',
+          requiresAuth: true,
+        },
+      },
+      {
+        path: 'raw-data/:rawDataId',
+        component: RawDataDetail,
+        meta: {
+          title: 'Raw Data 상세',
           requiresAuth: true,
         },
       },

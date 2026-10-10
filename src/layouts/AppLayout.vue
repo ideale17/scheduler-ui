@@ -23,6 +23,7 @@ const menuGroups = [
     menus: [
       { to: '/externalApi', label: 'API 관리', match: 'externalApi' },
       { to: '/externalApi/history', label: 'API 실행 이력', match: 'externalApiHistory' },
+      { to: '/raw-data', label: 'Raw Data 관리', match: 'rawData' },
     ],
   },
   {
@@ -50,6 +51,9 @@ const isActive = (menu) => {
 
     case 'externalApiHistory':
       return route.path === '/externalApi/history'
+
+    case 'rawData':
+      return route.path === '/raw-data'
 
     case 'schedulerInfo':
       return route.path === '/schedulerInfo'

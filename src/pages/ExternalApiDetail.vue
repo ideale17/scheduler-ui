@@ -16,6 +16,7 @@ const externalApi = ref(null)
 const paging = ref(null)
 const params = ref([])
 const loading = ref(true)
+const isExecuting = ref(false)
 
 const fetchExternalApiDetail = async () => {
   try {
@@ -43,13 +44,15 @@ const fetchExternalApiDetail = async () => {
 }
 
 const executeApi = async () => {
-  if (!externalApi.value) {
+  if (!externalApi.value || isExecuting.value) {
     return
   }
 
   if (!confirm(`${externalApi.value.apiName} API를 즉시 실행하시겠습니까?`)) {
     return
   }
+
+  isExecuting.value = true
 
   try {
     await executeExternalApi(externalApi.value.externalApiId)
@@ -58,6 +61,8 @@ const executeApi = async () => {
   } catch (error) {
     console.error('External API 호출 실패:', error)
     alert('External API 호출 실패')
+  } finally {
+    isExecuting.value = false
   }
 }
 
@@ -130,10 +135,11 @@ onMounted(() => {
           <div class="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              :disabled="isExecuting"
+              class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
               @click="executeApi"
             >
-              즉시 실행
+              {{ isExecuting ? '실행 중...' : '즉시 실행' }}
             </button>
 
             <button
