@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getRawDataList } from '@/api/rawDataApi'
 
@@ -13,15 +13,36 @@ const errorMessage = ref('')
 
 const searchCondition = ref({
   apiName: '',
+  executionId: '',
   startDate: '',
   endDate: '',
 })
 
-const currentPage = ref(1)
 const pageSize = ref(10)
 const totalCount = ref(0)
 
-// 2. 페이징 계산
+// 최신 요청의 응답만 반영하기 위한 식별자
+let requestId = 0
+
+// 2. URL 조회조건
+const queryValue = (value) => (typeof value === 'string' ? value : '')
+
+const currentPage = computed(() => {
+  const page = Number(route.query.page)
+
+  return Number.isSafeInteger(page) && page > 0 ? page : 1
+})
+
+const getQueryParams = () => ({
+  apiName: queryValue(route.query.apiName),
+  executionId: queryValue(route.query.executionId),
+  startDate: queryValue(route.query.startDate),
+  endDate: queryValue(route.query.endDate),
+  page: currentPage.value,
+  size: pageSize.value,
+})
+
+// 3. 페이징 계산
 const totalPages = computed(() => {
   if (totalCount.value === 0) {
     return 1
@@ -50,46 +71,75 @@ const visiblePages = computed(() => {
   return pages
 })
 
-// 3. Raw Data 목록 조회
-const fetchRawDataList = async () => {
-  if (isLoading.value) {
-    return
+// 4. URL의 검색조건을 화면에 복원한다.
+const applyRouteQuery = () => {
+  searchCondition.value = {
+    apiName: queryValue(route.query.apiName),
+    executionId: queryValue(route.query.executionId),
+    startDate: queryValue(route.query.startDate),
+    endDate: queryValue(route.query.endDate),
   }
+}
+
+// 5. Raw Data 목록 조회
+const fetchRawDataList = async () => {
+  const currentRequestId = ++requestId
+
+  // URL에 확정된 조건으로 조회한다.
+  const params = getQueryParams()
 
   isLoading.value = true
   errorMessage.value = ''
 
   try {
-    // 1. 검색조건과 페이징 정보로 Raw Data 목록을 조회한다.
-    const response = await getRawDataList({
-      apiName: searchCondition.value.apiName.trim(),
-      startDate: searchCondition.value.startDate,
-      endDate: searchCondition.value.endDate,
-      page: currentPage.value,
-      size: pageSize.value,
-    })
+    const response = await getRawDataList(params)
 
-    // 2. 조회 결과와 전체 건수를 저장한다.
+    // 이전 요청 결과는 화면에 반영하지 않는다.
+    if (currentRequestId !== requestId) {
+      return
+    }
+
     rawDataList.value = Array.isArray(response.data.content) ? response.data.content : []
+
     totalCount.value = Number(response.data.totalCount || 0)
   } catch (error) {
+    if (currentRequestId !== requestId) {
+      return
+    }
+
     console.error('Raw Data 목록 조회 실패:', error)
 
     rawDataList.value = []
     totalCount.value = 0
     errorMessage.value = 'Raw Data 목록을 불러오지 못했습니다.'
   } finally {
-    isLoading.value = false
+    if (currentRequestId === requestId) {
+      isLoading.value = false
+    }
   }
 }
 
-// 4. 검색
-const searchRawData = async () => {
-  if (isLoading.value) {
+// 6. URL Query 갱신
+const updateRouteQuery = async (query) => {
+  const target = router.resolve({
+    path: '/raw-data',
+    query,
+  })
+
+  // 같은 조회조건으로 다시 조회한 경우
+  if (target.fullPath === route.fullPath) {
+    await fetchRawDataList()
     return
   }
 
-  // 1. 조회 기간을 검증한다.
+  await router.push({
+    path: '/raw-data',
+    query,
+  })
+}
+
+// 7. 검색
+const searchRawData = async () => {
   if (
     searchCondition.value.startDate &&
     searchCondition.value.endDate &&
@@ -99,57 +149,85 @@ const searchRawData = async () => {
     return
   }
 
-  // 2. 첫 페이지부터 다시 조회한다.
-  currentPage.value = 1
-
-  // 3. 검색조건으로 Raw Data 목록을 조회한다.
-  await fetchRawDataList()
+  await updateRouteQuery({
+    apiName: searchCondition.value.apiName.trim() || undefined,
+    executionId: searchCondition.value.executionId || undefined,
+    startDate: searchCondition.value.startDate || undefined,
+    endDate: searchCondition.value.endDate || undefined,
+    page: '1',
+    returnTo: searchCondition.value.executionId ? returnToApiHistory.value || undefined : undefined,
+  })
 }
 
+// 8. 검색 초기화
 const resetSearchCondition = async () => {
-  if (isLoading.value) {
-    return
-  }
-
-  // 1. 검색조건을 초기화한다.
   searchCondition.value = {
     apiName: '',
+    executionId: '',
     startDate: '',
     endDate: '',
   }
 
-  // 2. 첫 페이지부터 다시 조회한다.
-  currentPage.value = 1
-
-  // 3. 전체 Raw Data 목록을 조회한다.
-  await fetchRawDataList()
-}
-
-// 5. 페이지 변경
-const changePage = async (page) => {
-  if (isLoading.value || page < 1 || page > totalPages.value) {
-    return
-  }
-
-  currentPage.value = page
-
-  await fetchRawDataList()
-}
-
-// 6. Raw Data 상세 이동
-const goRawDataDetail = (rawDataId) => {
-  router.push({
-    path: `/raw-data/${rawDataId}`,
-    query: {
-      apiName: searchCondition.value.apiName,
-      startDate: searchCondition.value.startDate,
-      endDate: searchCondition.value.endDate,
-      page: String(currentPage.value),
-    },
+  await updateRouteQuery({
+    page: '1',
   })
 }
 
-// 7. 화면 표시용 변환
+// 9. 페이지 변경
+const changePage = async (page) => {
+  if (page < 1 || page > totalPages.value || page === currentPage.value) {
+    return
+  }
+
+  await updateRouteQuery({
+    apiName: queryValue(route.query.apiName) || undefined,
+    executionId: queryValue(route.query.executionId) || undefined,
+    startDate: queryValue(route.query.startDate) || undefined,
+    endDate: queryValue(route.query.endDate) || undefined,
+    page: String(page),
+    returnTo: returnToApiHistory.value || undefined,
+  })
+}
+
+// 10. Raw Data 상세 이동
+const goRawDataDetail = (rawDataId) => {
+  router.push({
+    path: `/raw-data/${rawDataId}`,
+    query: route.query,
+  })
+}
+
+// 11. API 호출 이력 복귀 경로
+const returnToApiHistory = computed(() => {
+  const returnTo = route.query.returnTo
+
+  if (typeof returnTo !== 'string') {
+    return ''
+  }
+
+  // 허용된 API 호출 이력 경로만 복귀 대상으로 사용한다.
+  if (!/^\/externalApi\/history(?:\?|$)/.test(returnTo)) {
+    return ''
+  }
+
+  const resolved = router.resolve(returnTo)
+
+  if (resolved.path !== '/externalApi/history') {
+    return ''
+  }
+
+  return resolved.fullPath
+})
+
+const goApiHistory = () => {
+  if (!returnToApiHistory.value) {
+    return
+  }
+
+  router.push(returnToApiHistory.value)
+}
+
+// 12. 날짜 표시
 const formatDateTime = (dateTime) => {
   if (!dateTime) {
     return '-'
@@ -158,23 +236,25 @@ const formatDateTime = (dateTime) => {
   return String(dateTime).replace('T', ' ').substring(0, 19)
 }
 
-// 8. 화면 최초 진입
-onMounted(() => {
-  // 1. URL에 전달된 검색조건을 복원한다.
-  searchCondition.value.apiName = typeof route.query.apiName === 'string' ? route.query.apiName : ''
+// 13. 검색조건과 페이지 변경 시 목록 조회
+watch(
+  [
+    () => route.query.apiName,
+    () => route.query.executionId,
+    () => route.query.startDate,
+    () => route.query.endDate,
+    () => route.query.page,
+  ],
+  () => {
+    applyRouteQuery()
+    fetchRawDataList()
+  },
+  { immediate: true },
+)
 
-  searchCondition.value.startDate =
-    typeof route.query.startDate === 'string' ? route.query.startDate : ''
-
-  searchCondition.value.endDate = typeof route.query.endDate === 'string' ? route.query.endDate : ''
-
-  // 2. URL에 전달된 페이지 번호를 복원한다.
-  const page = Number(route.query.page)
-
-  currentPage.value = Number.isSafeInteger(page) && page > 0 ? page : 1
-
-  // 3. 설정된 검색조건으로 Raw Data 목록을 조회한다.
-  fetchRawDataList()
+// 14. 화면 종료 후 이전 요청 결과 반영 방지
+onUnmounted(() => {
+  requestId++
 })
 </script>
 
@@ -233,6 +313,31 @@ onMounted(() => {
           @click="searchRawData"
         >
           {{ isLoading ? '조회 중...' : '조회' }}
+        </button>
+      </div>
+    </div>
+
+    <!-- API 실행 이력에서 이동한 경우 -->
+    <div
+      v-if="searchCondition.executionId"
+      class="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3"
+    >
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="min-w-0">
+          <div class="text-sm font-medium text-blue-900">API 실행 기준으로 조회 중</div>
+
+          <div class="mt-1 break-all text-xs text-blue-700">
+            Execution ID: {{ searchCondition.executionId }}
+          </div>
+        </div>
+
+        <button
+          v-if="returnToApiHistory"
+          type="button"
+          class="shrink-0 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          @click="goApiHistory"
+        >
+          ← API 호출 이력으로 돌아가기
         </button>
       </div>
     </div>

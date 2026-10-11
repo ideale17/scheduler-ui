@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   getExternalApiCallHistory,
@@ -14,6 +14,12 @@ const historyList = ref([])
 const selectedHistoryId = ref(null)
 const detailList = ref([])
 const detailLoading = ref(false)
+const isLoading = ref(false)
+const errorMessage = ref('')
+
+// 최신 요청만 결과에 반영하기 위한 식별자
+let listRequestId = 0
+let detailRequestId = 0
 
 const searchCondition = ref({
   apiName: '',
@@ -23,9 +29,17 @@ const searchCondition = ref({
   endDate: '',
 })
 
-const currentPage = ref(1)
 const pageSize = ref(10)
 const totalCount = ref(0)
+
+// URL 조회조건
+const queryValue = (value) => (typeof value === 'string' ? value : '')
+
+const currentPage = computed(() => {
+  const page = Number(route.query.page)
+
+  return Number.isSafeInteger(page) && page > 0 ? page : 1
+})
 
 // 계산값
 const totalPages = computed(() => {
@@ -56,36 +70,82 @@ const visiblePages = computed(() => {
   return pages
 })
 
+// URL Query를 화면의 검색조건과 페이지에 반영한다.
+const applyRouteQuery = () => {
+  searchCondition.value = {
+    apiName: queryValue(route.query.apiName),
+    status: queryValue(route.query.status),
+    fireInstanceId: queryValue(route.query.fireInstanceId),
+    startDate: queryValue(route.query.startDate),
+    endDate: queryValue(route.query.endDate),
+  }
+}
+
+// 현재 검색조건과 페이지를 URL Query에 반영한다.
+const updateRouteQuery = async (query) => {
+  const target = router.resolve({
+    path: '/externalApi/history',
+    query,
+  })
+
+  if (target.fullPath === route.fullPath) {
+    await fetchCallHistoryList()
+    return
+  }
+
+  await router.push({
+    path: '/externalApi/history',
+    query,
+  })
+}
+
 // External API 호출 이력 조회
 const fetchCallHistoryList = async () => {
-  try {
-    // 1. 검색조건과 페이징 정보로 External API 호출 이력을 조회한다.
-    const response = await getExternalApiCallHistory({
-      apiName: searchCondition.value.apiName.trim(),
-      status: searchCondition.value.status,
-      fireInstanceId: searchCondition.value.fireInstanceId,
-      startDate: searchCondition.value.startDate,
-      endDate: searchCondition.value.endDate,
-      page: currentPage.value,
-      size: pageSize.value,
-    })
+  const currentRequestId = ++listRequestId
 
-    // 2. 조회 결과를 호출 이력 목록에 저장한다.
+  // URL에 확정된 조건만 조회에 사용한다.
+  const params = {
+    apiName: queryValue(route.query.apiName),
+    status: queryValue(route.query.status),
+    fireInstanceId: queryValue(route.query.fireInstanceId),
+    startDate: queryValue(route.query.startDate),
+    endDate: queryValue(route.query.endDate),
+    page: currentPage.value,
+    size: pageSize.value,
+  }
+
+  isLoading.value = true
+  errorMessage.value = ''
+
+  try {
+    const response = await getExternalApiCallHistory(params)
+
+    if (currentRequestId !== listRequestId) {
+      return
+    }
+
     historyList.value = Array.isArray(response.data.content) ? response.data.content : []
 
-    // 3. 전체 호출 이력 건수를 저장한다.
     totalCount.value = Number(response.data.totalCount || 0)
   } catch (error) {
+    if (currentRequestId !== listRequestId) {
+      return
+    }
+
     console.error('External API 호출 이력 조회 실패:', error)
 
     historyList.value = []
     totalCount.value = 0
+    errorMessage.value = 'API 호출 이력을 불러오지 못했습니다.'
+  } finally {
+    if (currentRequestId === listRequestId) {
+      isLoading.value = false
+    }
   }
 }
 
 // 검색
 const searchCallHistory = async () => {
-  // 1. 조회 기간을 검증한다.
   if (
     searchCondition.value.startDate &&
     searchCondition.value.endDate &&
@@ -95,16 +155,20 @@ const searchCallHistory = async () => {
     return
   }
 
-  // 2. 첫 페이지부터 다시 조회한다.
-  currentPage.value = 1
-  selectedHistoryId.value = null
-
-  // 3. 검색조건으로 호출 이력을 조회한다.
-  await fetchCallHistoryList()
+  await updateRouteQuery({
+    apiName: searchCondition.value.apiName.trim() || undefined,
+    status: searchCondition.value.status || undefined,
+    fireInstanceId: searchCondition.value.fireInstanceId || undefined,
+    startDate: searchCondition.value.startDate || undefined,
+    endDate: searchCondition.value.endDate || undefined,
+    page: '1',
+    returnTo: searchCondition.value.fireInstanceId
+      ? returnToJobHistory.value || undefined
+      : undefined,
+  })
 }
 
 const resetSearchCondition = async () => {
-  // 1. 검색조건을 초기화한다.
   searchCondition.value = {
     apiName: '',
     status: '',
@@ -113,52 +177,37 @@ const resetSearchCondition = async () => {
     endDate: '',
   }
 
-  // 2. 페이지와 상세 선택 상태를 초기화한다.
-  currentPage.value = 1
-  selectedHistoryId.value = null
-
-  // 3. 전체 호출 이력을 다시 조회한다.
-  await fetchCallHistoryList()
+  await updateRouteQuery({ page: '1' })
 }
 
 // 페이징
 const changePage = async (page) => {
-  if (page < 1 || page > totalPages.value) {
+  if (page < 1 || page > totalPages.value || page === currentPage.value) {
     return
   }
 
-  currentPage.value = page
-  selectedHistoryId.value = null
-
-  await fetchCallHistoryList()
+  await updateRouteQuery({
+    apiName: queryValue(route.query.apiName) || undefined,
+    status: queryValue(route.query.status) || undefined,
+    fireInstanceId: queryValue(route.query.fireInstanceId) || undefined,
+    startDate: queryValue(route.query.startDate) || undefined,
+    endDate: queryValue(route.query.endDate) || undefined,
+    page: String(page),
+    returnTo: returnToJobHistory.value || undefined,
+  })
 }
 
 // 상세
 const toggleHistoryDetail = async (executionId) => {
-  // 1. 현재 열려 있는 상세를 다시 클릭하면 닫는다.
-  if (selectedHistoryId.value === executionId) {
-    selectedHistoryId.value = null
-    detailList.value = []
-    return
-  }
+  const selectedExecutionId = selectedHistoryId.value === executionId ? undefined : executionId
 
-  // 2. 선택한 External API 실행 상세를 연다.
-  selectedHistoryId.value = executionId
-  detailList.value = []
-  detailLoading.value = true
-
-  try {
-    // 3. 실행 식별자로 개별 호출 시도 이력을 조회한다.
-    const response = await getExternalApiCallHistoryDetail(executionId)
-
-    // 4. 조회 결과를 상세 목록에 저장한다.
-    detailList.value = Array.isArray(response.data) ? response.data : []
-  } catch (error) {
-    console.error('External API 호출 상세 이력 조회 실패:', error)
-    detailList.value = []
-  } finally {
-    detailLoading.value = false
-  }
+  await router.replace({
+    path: '/externalApi/history',
+    query: {
+      ...route.query,
+      selectedExecutionId,
+    },
+  })
 }
 
 // 화면 표시용 변환
@@ -214,16 +263,85 @@ const goJobHistory = () => {
   router.push(returnToJobHistory.value)
 }
 
-// 화면 최초 진입
-onMounted(() => {
-  // 1. External API 목록에서 전달한 API명이 있으면 검색조건에 반영한다.
-  searchCondition.value.apiName = typeof route.query.apiName === 'string' ? route.query.apiName : ''
+// 선택한 API 실행에서 수집한 Raw Data 목록으로 이동한다.
+const goRawDataList = (executionId) => {
+  if (!executionId) {
+    return
+  }
 
-  searchCondition.value.fireInstanceId =
-    typeof route.query.fireInstanceId === 'string' ? route.query.fireInstanceId : ''
+  // 1. 현재 API 호출 이력 화면의 URL을 복귀 경로로 사용한다.
+  const returnTo = route.fullPath
 
-  // 2. 설정된 검색조건으로 호출 이력을 조회한다.
-  fetchCallHistoryList()
+  // 2. 실행 식별자를 전달하여 Raw Data 목록으로 이동한다.
+  router.push({
+    path: '/raw-data',
+    query: {
+      executionId,
+      returnTo,
+    },
+  })
+}
+
+watch(
+  [
+    () => route.query.apiName,
+    () => route.query.status,
+    () => route.query.fireInstanceId,
+    () => route.query.startDate,
+    () => route.query.endDate,
+    () => route.query.page,
+  ],
+  () => {
+    applyRouteQuery()
+    fetchCallHistoryList()
+  },
+  { immediate: true },
+)
+
+watch(
+  () => route.query.selectedExecutionId,
+  async (selectedExecutionId) => {
+    const currentRequestId = ++detailRequestId
+
+    selectedHistoryId.value =
+      typeof selectedExecutionId === 'string' && selectedExecutionId ? selectedExecutionId : null
+
+    detailList.value = []
+
+    if (!selectedHistoryId.value) {
+      detailLoading.value = false
+      return
+    }
+
+    detailLoading.value = true
+
+    try {
+      const response = await getExternalApiCallHistoryDetail(selectedHistoryId.value)
+
+      if (currentRequestId !== detailRequestId) {
+        return
+      }
+
+      detailList.value = Array.isArray(response.data) ? response.data : []
+    } catch (error) {
+      if (currentRequestId !== detailRequestId) {
+        return
+      }
+
+      console.error('External API 호출 상세 이력 조회 실패:', error)
+      detailList.value = []
+    } finally {
+      if (currentRequestId === detailRequestId) {
+        detailLoading.value = false
+      }
+    }
+  },
+  { immediate: true },
+)
+
+onUnmounted(() => {
+  listRequestId++
+  detailRequestId++
 })
 </script>
 
@@ -530,6 +648,18 @@ onMounted(() => {
                   </div>
 
                   <div v-else class="py-4 text-sm text-gray-500">호출 시도 이력이 없습니다.</div>
+                </div>
+
+                <!-- Raw Data 목록 이동 -->
+                <div class="mt-4 flex justify-end border-t border-gray-200 pt-4">
+                  <button
+                    type="button"
+                    :disabled="!history.executionId || history.status === 'RUNNING'"
+                    class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    @click="goRawDataList(history.executionId)"
+                  >
+                    Raw Data 보기 →
+                  </button>
                 </div>
               </td>
             </tr>

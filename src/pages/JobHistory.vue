@@ -1,13 +1,16 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getJobHistory } from '@/api/jobHistoryApi'
 
 // 1. 화면 상태
 const route = useRoute()
 const router = useRouter()
+
 const historyList = ref([])
 const selectedHistoryId = ref(null)
+const isLoading = ref(false)
+const errorMessage = ref('')
 
 const searchCondition = ref({
   jobName: '',
@@ -17,11 +20,32 @@ const searchCondition = ref({
   endDate: '',
 })
 
-const currentPage = ref(1)
 const pageSize = ref(10)
 const totalCount = ref(0)
 
-// 2. 계산값
+// 최신 요청만 결과에 반영하기 위한 식별자
+let requestId = 0
+
+// 2. URL 조회조건
+const queryValue = (value) => (typeof value === 'string' ? value : '')
+
+const currentPage = computed(() => {
+  const page = Number(route.query.page)
+
+  return Number.isSafeInteger(page) && page > 0 ? page : 1
+})
+
+const getQueryParams = () => ({
+  jobName: queryValue(route.query.jobName),
+  jobGroup: queryValue(route.query.jobGroup),
+  status: queryValue(route.query.status),
+  startDate: queryValue(route.query.startDate),
+  endDate: queryValue(route.query.endDate),
+  page: currentPage.value,
+  size: pageSize.value,
+})
+
+// 3. 페이징 계산
 const totalPages = computed(() => {
   if (totalCount.value === 0) {
     return 1
@@ -34,7 +58,6 @@ const visiblePages = computed(() => {
   const maxVisiblePages = 5
 
   let startPage = Math.max(currentPage.value - Math.floor(maxVisiblePages / 2), 1)
-
   let endPage = startPage + maxVisiblePages - 1
 
   if (endPage > totalPages.value) {
@@ -51,35 +74,78 @@ const visiblePages = computed(() => {
   return pages
 })
 
-// 3. 실행 이력 조회
-const fetchJobHistoryList = async () => {
-  try {
-    // 1. 화면에 입력된 검색조건과 페이징 정보로 실행 이력 조회 API를 호출한다.
-    const response = await getJobHistory({
-      jobName: searchCondition.value.jobName.trim(),
-      jobGroup: searchCondition.value.jobGroup.trim(),
-      status: searchCondition.value.status,
-      startDate: searchCondition.value.startDate,
-      endDate: searchCondition.value.endDate,
-      page: currentPage.value,
-      size: pageSize.value,
-    })
-
-    // 2. 조회 결과를 실행 이력 목록에 저장한다.
-    historyList.value = Array.isArray(response.data.content) ? response.data.content : []
-
-    // 3. 전체 실행 이력 건수를 저장한다.
-    totalCount.value = Number(response.data.totalCount || 0)
-  } catch (error) {
-    console.error('목록 불러오기 실패:', error)
-    historyList.value = []
-    totalCount.value = 0
+// 4. URL 검색조건을 입력 폼에 복원한다.
+const applyRouteQuery = () => {
+  searchCondition.value = {
+    jobName: queryValue(route.query.jobName),
+    jobGroup: queryValue(route.query.jobGroup),
+    status: queryValue(route.query.status),
+    startDate: queryValue(route.query.startDate),
+    endDate: queryValue(route.query.endDate),
   }
 }
 
-// 4. 검색
+// 5. 실행 이력 조회
+const fetchJobHistoryList = async () => {
+  console.trace('Job 실행 이력 조회 호출')
+
+  const currentRequestId = ++requestId
+
+  // URL에 확정된 조회조건을 요청 시작 시점에 고정한다.
+  const params = getQueryParams()
+
+  isLoading.value = true
+  errorMessage.value = ''
+
+  try {
+    const response = await getJobHistory(params)
+
+    // 이전 요청의 응답은 화면에 반영하지 않는다.
+    if (currentRequestId !== requestId) {
+      return
+    }
+
+    historyList.value = Array.isArray(response.data.content) ? response.data.content : []
+
+    totalCount.value = Number(response.data.totalCount || 0)
+  } catch (error) {
+    if (currentRequestId !== requestId) {
+      return
+    }
+
+    console.error('Job 실행 이력 조회 실패:', error)
+
+    historyList.value = []
+    totalCount.value = 0
+    errorMessage.value = 'Job 실행 이력을 불러오지 못했습니다.'
+  } finally {
+    if (currentRequestId === requestId) {
+      isLoading.value = false
+    }
+  }
+}
+
+// 6. URL 조회조건 변경
+const updateRouteQuery = async (query) => {
+  const target = router.resolve({
+    path: '/JobHistory',
+    query,
+  })
+
+  // 동일한 URL로 다시 조회하면 명시적으로 API를 호출한다.
+  if (target.fullPath === route.fullPath) {
+    await fetchJobHistoryList()
+    return
+  }
+
+  await router.push({
+    path: '/JobHistory',
+    query,
+  })
+}
+
+// 7. 검색
 const searchJobHistory = async () => {
-  // 1. 시작일과 종료일이 모두 입력된 경우 기간을 검증한다.
   if (
     searchCondition.value.startDate &&
     searchCondition.value.endDate &&
@@ -89,18 +155,18 @@ const searchJobHistory = async () => {
     return
   }
 
-  // 2. 페이지를 첫 페이지로 초기화한다.
-  currentPage.value = 1
-
-  // 3. 열려 있는 실행 이력 상세를 닫는다.
-  selectedHistoryId.value = null
-
-  // 4. 검색조건으로 실행 이력을 다시 조회한다.
-  await fetchJobHistoryList()
+  await updateRouteQuery({
+    jobName: searchCondition.value.jobName.trim() || undefined,
+    jobGroup: searchCondition.value.jobGroup.trim() || undefined,
+    status: searchCondition.value.status || undefined,
+    startDate: searchCondition.value.startDate || undefined,
+    endDate: searchCondition.value.endDate || undefined,
+    page: '1',
+  })
 }
 
+// 8. 초기화
 const resetSearchCondition = async () => {
-  // 1. 검색조건을 초기값으로 되돌린다.
   searchCondition.value = {
     jobName: '',
     jobGroup: '',
@@ -109,62 +175,57 @@ const resetSearchCondition = async () => {
     endDate: '',
   }
 
-  // 2. 페이지를 첫 페이지로 초기화한다.
-  currentPage.value = 1
-
-  // 3. 열려 있는 실행 이력 상세를 닫는다.
-  selectedHistoryId.value = null
-
-  // 4. 전체 실행 이력을 다시 조회한다.
-  await fetchJobHistoryList()
+  await updateRouteQuery({
+    page: '1',
+  })
 }
 
-// 5. 페이징
+// 9. 페이징
 const changePage = async (page) => {
-  if (page < 1 || page > totalPages.value) {
+  if (page < 1 || page > totalPages.value || page === currentPage.value) {
     return
   }
 
-  currentPage.value = page
-  selectedHistoryId.value = null
-
-  await fetchJobHistoryList()
+  await updateRouteQuery({
+    jobName: queryValue(route.query.jobName) || undefined,
+    jobGroup: queryValue(route.query.jobGroup) || undefined,
+    status: queryValue(route.query.status) || undefined,
+    startDate: queryValue(route.query.startDate) || undefined,
+    endDate: queryValue(route.query.endDate) || undefined,
+    page: String(page),
+  })
 }
 
-// 6. 상세
-const toggleHistoryDetail = (logId) => {
-  selectedHistoryId.value = selectedHistoryId.value === logId ? null : logId
+// 10. 상세 펼침
+const toggleHistoryDetail = async (logId) => {
+  const selectedLogId = selectedHistoryId.value === logId ? null : logId
+
+  // 상세 선택은 목록 조회조건이 아니므로 replace를 사용한다.
+  await router.replace({
+    path: '/JobHistory',
+    query: {
+      ...route.query,
+      selectedLogId: selectedLogId ? String(selectedLogId) : undefined,
+    },
+  })
 }
 
+// 11. API 호출 이력 이동
 const goApiCallHistory = (fireInstanceId) => {
   if (!fireInstanceId) {
     return
   }
 
-  // 현재 검색조건, 페이지, 펼쳐진 상세 정보를 복귀 URL에 보관한다.
-  const returnTo = router.resolve({
-    path: '/JobHistory',
-    query: {
-      jobName: searchCondition.value.jobName,
-      jobGroup: searchCondition.value.jobGroup,
-      status: searchCondition.value.status,
-      startDate: searchCondition.value.startDate,
-      endDate: searchCondition.value.endDate,
-      page: String(currentPage.value),
-      selectedLogId: String(selectedHistoryId.value ?? ''),
-    },
-  }).fullPath
-
   router.push({
     path: '/externalApi/history',
     query: {
       fireInstanceId,
-      returnTo,
+      returnTo: route.fullPath,
     },
   })
 }
 
-// 7. 화면 표시용 변환
+// 12. 화면 표시용 변환
 const formatRunMillis = (runMillis) => {
   const millis = Number(runMillis)
 
@@ -177,6 +238,7 @@ const formatRunMillis = (runMillis) => {
   }
 
   const seconds = millis / 1000
+
   return Number.isInteger(seconds) ? `${seconds}초` : `${seconds.toFixed(2)}초`
 }
 
@@ -188,30 +250,37 @@ const formatDateTime = (dateTime) => {
   return String(dateTime).replace('T', ' ').substring(0, 19)
 }
 
-// 8. 화면 최초 진입
-onMounted(() => {
-  searchCondition.value.jobName = typeof route.query.jobName === 'string' ? route.query.jobName : ''
+// 13. 조회조건과 페이지가 변경된 경우에만 목록을 조회한다.
+watch(
+  [
+    () => route.query.jobName,
+    () => route.query.jobGroup,
+    () => route.query.status,
+    () => route.query.startDate,
+    () => route.query.endDate,
+    () => route.query.page,
+  ],
+  () => {
+    applyRouteQuery()
+    fetchJobHistoryList()
+  },
+  { immediate: true },
+)
 
-  searchCondition.value.jobGroup =
-    typeof route.query.jobGroup === 'string' ? route.query.jobGroup : ''
+// 14. 상세 선택 상태는 별도로 복원한다.
+watch(
+  () => route.query.selectedLogId,
+  (selectedLogId) => {
+    const logId = Number(selectedLogId)
 
-  searchCondition.value.status = typeof route.query.status === 'string' ? route.query.status : ''
+    selectedHistoryId.value = Number.isSafeInteger(logId) && logId > 0 ? logId : null
+  },
+  { immediate: true },
+)
 
-  searchCondition.value.startDate =
-    typeof route.query.startDate === 'string' ? route.query.startDate : ''
-
-  searchCondition.value.endDate = typeof route.query.endDate === 'string' ? route.query.endDate : ''
-
-  const page = Number(route.query.page)
-
-  currentPage.value = Number.isSafeInteger(page) && page > 0 ? page : 1
-
-  const selectedLogId = Number(route.query.selectedLogId)
-
-  selectedHistoryId.value =
-    Number.isSafeInteger(selectedLogId) && selectedLogId > 0 ? selectedLogId : null
-
-  fetchJobHistoryList()
+// 15. 화면 종료 후 응답이 반영되지 않도록 한다.
+onUnmounted(() => {
+  requestId++
 })
 </script>
 
@@ -294,6 +363,17 @@ onMounted(() => {
         </button>
       </div>
     </div>
+
+    <!-- 조회 오류 -->
+    <div
+      v-if="errorMessage"
+      class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+    >
+      {{ errorMessage }}
+    </div>
+
+    <!-- 조회 상태 -->
+    <div v-if="isLoading" class="text-sm text-gray-500">Job 실행 이력을 불러오는 중입니다.</div>
 
     <!-- 실행 이력 -->
     <div
