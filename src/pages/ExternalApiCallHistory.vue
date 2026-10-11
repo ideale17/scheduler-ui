@@ -1,12 +1,15 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import {
   getExternalApiCallHistory,
   getExternalApiCallHistoryDetail,
 } from '@/api/externalApiCallHistoryApi'
 
-// 1. 화면 상태
+// 화면 상태
+const route = useRoute()
+const router = useRouter()
+
 const historyList = ref([])
 const selectedHistoryId = ref(null)
 const detailList = ref([])
@@ -15,6 +18,7 @@ const detailLoading = ref(false)
 const searchCondition = ref({
   apiName: '',
   status: '',
+  fireInstanceId: '',
   startDate: '',
   endDate: '',
 })
@@ -23,9 +27,7 @@ const currentPage = ref(1)
 const pageSize = ref(10)
 const totalCount = ref(0)
 
-const route = useRoute()
-
-// 2. 계산값
+// 계산값
 const totalPages = computed(() => {
   if (totalCount.value === 0) {
     return 1
@@ -54,13 +56,14 @@ const visiblePages = computed(() => {
   return pages
 })
 
-// 3. External API 호출 이력 조회
+// External API 호출 이력 조회
 const fetchCallHistoryList = async () => {
   try {
     // 1. 검색조건과 페이징 정보로 External API 호출 이력을 조회한다.
     const response = await getExternalApiCallHistory({
       apiName: searchCondition.value.apiName.trim(),
       status: searchCondition.value.status,
+      fireInstanceId: searchCondition.value.fireInstanceId,
       startDate: searchCondition.value.startDate,
       endDate: searchCondition.value.endDate,
       page: currentPage.value,
@@ -80,7 +83,7 @@ const fetchCallHistoryList = async () => {
   }
 }
 
-// 4. 검색
+// 검색
 const searchCallHistory = async () => {
   // 1. 조회 기간을 검증한다.
   if (
@@ -105,6 +108,7 @@ const resetSearchCondition = async () => {
   searchCondition.value = {
     apiName: '',
     status: '',
+    fireInstanceId: '',
     startDate: '',
     endDate: '',
   }
@@ -117,7 +121,7 @@ const resetSearchCondition = async () => {
   await fetchCallHistoryList()
 }
 
-// 5. 페이징
+// 페이징
 const changePage = async (page) => {
   if (page < 1 || page > totalPages.value) {
     return
@@ -129,7 +133,7 @@ const changePage = async (page) => {
   await fetchCallHistoryList()
 }
 
-// 6. 상세
+// 상세
 const toggleHistoryDetail = async (executionId) => {
   // 1. 현재 열려 있는 상세를 다시 클릭하면 닫는다.
   if (selectedHistoryId.value === executionId) {
@@ -157,7 +161,7 @@ const toggleHistoryDetail = async (executionId) => {
   }
 }
 
-// 7. 화면 표시용 변환
+// 화면 표시용 변환
 const formatRunMillis = (runMillis) => {
   const millis = Number(runMillis)
 
@@ -186,10 +190,37 @@ const getExecutionType = (fireInstanceId) => {
   return fireInstanceId ? '스케줄 실행' : '즉시 실행'
 }
 
-// 8. 화면 최초 진입
+// Job 실행 이력에서 이동한 경우에만 복귀 경로를 사용한다.
+const returnToJobHistory = computed(() => {
+  const returnTo = route.query.returnTo
+
+  if (typeof returnTo !== 'string') {
+    return ''
+  }
+
+  // 임의의 외부 URL이나 다른 페이지로 이동하지 않도록 경로를 제한한다.
+  if (!/^\/JobHistory(?:\?|$)/.test(returnTo)) {
+    return ''
+  }
+
+  return returnTo
+})
+
+const goJobHistory = () => {
+  if (!returnToJobHistory.value) {
+    return
+  }
+
+  router.push(returnToJobHistory.value)
+}
+
+// 화면 최초 진입
 onMounted(() => {
   // 1. External API 목록에서 전달한 API명이 있으면 검색조건에 반영한다.
   searchCondition.value.apiName = typeof route.query.apiName === 'string' ? route.query.apiName : ''
+
+  searchCondition.value.fireInstanceId =
+    typeof route.query.fireInstanceId === 'string' ? route.query.fireInstanceId : ''
 
   // 2. 설정된 검색조건으로 호출 이력을 조회한다.
   fetchCallHistoryList()
@@ -262,6 +293,31 @@ onMounted(() => {
           @click="searchCallHistory"
         >
           조회
+        </button>
+      </div>
+    </div>
+
+    <!-- Job 실행 이력에서 이동한 경우 -->
+    <div
+      v-if="searchCondition.fireInstanceId"
+      class="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3"
+    >
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="min-w-0">
+          <div class="text-sm font-medium text-blue-900">Job 실행 기준으로 조회 중</div>
+
+          <div class="mt-1 break-all text-xs text-blue-700">
+            Fire Instance ID: {{ searchCondition.fireInstanceId }}
+          </div>
+        </div>
+
+        <button
+          v-if="returnToJobHistory"
+          type="button"
+          class="shrink-0 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          @click="goJobHistory"
+        >
+          ← Job 실행 이력으로 돌아가기
         </button>
       </div>
     </div>

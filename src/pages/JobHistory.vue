@@ -1,10 +1,11 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { getJobHistory } from '@/api/jobHistoryApi'
 
 // 1. 화면 상태
 const route = useRoute()
+const router = useRouter()
 const historyList = ref([])
 const selectedHistoryId = ref(null)
 
@@ -135,6 +136,34 @@ const toggleHistoryDetail = (logId) => {
   selectedHistoryId.value = selectedHistoryId.value === logId ? null : logId
 }
 
+const goApiCallHistory = (fireInstanceId) => {
+  if (!fireInstanceId) {
+    return
+  }
+
+  // 현재 검색조건, 페이지, 펼쳐진 상세 정보를 복귀 URL에 보관한다.
+  const returnTo = router.resolve({
+    path: '/JobHistory',
+    query: {
+      jobName: searchCondition.value.jobName,
+      jobGroup: searchCondition.value.jobGroup,
+      status: searchCondition.value.status,
+      startDate: searchCondition.value.startDate,
+      endDate: searchCondition.value.endDate,
+      page: String(currentPage.value),
+      selectedLogId: String(selectedHistoryId.value ?? ''),
+    },
+  }).fullPath
+
+  router.push({
+    path: '/externalApi/history',
+    query: {
+      fireInstanceId,
+      returnTo,
+    },
+  })
+}
+
 // 7. 화면 표시용 변환
 const formatRunMillis = (runMillis) => {
   const millis = Number(runMillis)
@@ -161,12 +190,27 @@ const formatDateTime = (dateTime) => {
 
 // 8. 화면 최초 진입
 onMounted(() => {
-  // 1. Job 목록에서 전달한 Job명과 그룹이 있으면 검색조건에 반영한다.
   searchCondition.value.jobName = typeof route.query.jobName === 'string' ? route.query.jobName : ''
+
   searchCondition.value.jobGroup =
     typeof route.query.jobGroup === 'string' ? route.query.jobGroup : ''
 
-  // 2. 설정된 검색조건으로 실행 이력을 조회한다.
+  searchCondition.value.status = typeof route.query.status === 'string' ? route.query.status : ''
+
+  searchCondition.value.startDate =
+    typeof route.query.startDate === 'string' ? route.query.startDate : ''
+
+  searchCondition.value.endDate = typeof route.query.endDate === 'string' ? route.query.endDate : ''
+
+  const page = Number(route.query.page)
+
+  currentPage.value = Number.isSafeInteger(page) && page > 0 ? page : 1
+
+  const selectedLogId = Number(route.query.selectedLogId)
+
+  selectedHistoryId.value =
+    Number.isSafeInteger(selectedLogId) && selectedLogId > 0 ? selectedLogId : null
+
   fetchJobHistoryList()
 })
 </script>
@@ -398,6 +442,20 @@ onMounted(() => {
                     >
                       {{ h.exceptionMessage || '예외 메시지가 없습니다.' }}
                     </div>
+                  </div>
+
+                  <!-- 연관 API 호출 이력 이동 -->
+                  <div
+                    v-if="h.fireInstanceId"
+                    class="mt-4 flex justify-end border-t border-gray-200 pt-4"
+                  >
+                    <button
+                      type="button"
+                      class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      @click="goApiCallHistory(h.fireInstanceId)"
+                    >
+                      API 호출 이력 보기 →
+                    </button>
                   </div>
                 </div>
               </td>
