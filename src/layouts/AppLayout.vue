@@ -24,6 +24,7 @@ const menuGroups = [
       { to: '/externalApi', label: 'API 관리', match: 'externalApi' },
       { to: '/externalApi/history', label: 'API 실행 이력', match: 'externalApiHistory' },
       { to: '/raw-data', label: 'Raw Data 관리', match: 'rawData' },
+      { to: '/transform-rule', label: '가공 규칙 관리', match: 'transformRule' },
     ],
   },
   {
@@ -54,6 +55,9 @@ const isActive = (menu) => {
 
     case 'rawData':
       return route.path === '/raw-data'
+
+    case 'transformRule':
+      return route.path === '/transform-rule' || route.path.startsWith('/transform-rule/')
 
     case 'schedulerInfo':
       return route.path === '/schedulerInfo'

@@ -16,6 +16,9 @@ import ExternalApiEdit from '@/pages/ExternalApiEdit.vue'
 import ExternalApiCallHistory from '@/pages/ExternalApiCallHistory.vue'
 import RawDataList from '@/pages/RawDataList.vue'
 import RawDataDetail from '@/pages/RawDataDetail.vue'
+import TransformRuleList from '@/pages/TransformRuleList.vue'
+import TransformRuleDetail from '@/pages/TransformRuleDetail.vue'
+import TransformRuleAdd from '@/pages/TransformRuleAdd.vue'
 
 const routes = [
   { path: '/login', component: LoginView, meta: { requiresAuth: false, public: true } },
@@ -94,6 +97,30 @@ const routes = [
         component: RawDataDetail,
         meta: {
           title: 'Raw Data 상세',
+          requiresAuth: true,
+        },
+      },
+      {
+        path: 'transform-rule',
+        component: TransformRuleList,
+        meta: {
+          title: '가공 규칙 관리',
+          requiresAuth: true,
+        },
+      },
+      {
+        path: 'transform-rule/:transformRuleId',
+        component: TransformRuleDetail,
+        meta: {
+          title: '가공 규칙 상세',
+          requiresAuth: true,
+        },
+      },
+      {
+        path: 'transform-rule/add',
+        component: TransformRuleAdd,
+        meta: {
+          title: '가공 규칙 등록',
           requiresAuth: true,
         },
       },
