@@ -160,7 +160,7 @@ const getSourceValue = (data, sourcePath) => {
       return undefined
     }
 
-    if (!Object.prototype.hasOwnProperty.call(value, key)) {
+    if (!Object.hasOwn(value, key)) {
       return undefined
     }
 
