@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { createTransformRule } from '@/api/transformRuleApi'
 import { parseXmlTree } from '@/utils/xmlUtils'
@@ -24,6 +24,9 @@ const version = ref({
 })
 
 const fields = ref([])
+const previewResult = ref(null)
+const previewError = ref('')
+const isPreviewed = ref(false)
 
 const inputClass =
   'w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-gray-500'
@@ -150,6 +153,187 @@ const validateForm = () => {
 
   return true
 }
+
+const getSourceValue = (data, sourcePath) => {
+  return sourcePath.split('.').reduce((value, key) => {
+    if (value === null || value === undefined || typeof value !== 'object') {
+      return undefined
+    }
+
+    if (!Object.prototype.hasOwnProperty.call(value, key)) {
+      return undefined
+    }
+
+    return value[key]
+  }, data)
+}
+
+const convertFieldValue = (value, field) => {
+  // 1. 필수 필드 여부를 확인한다.
+  if (value === null || value === undefined || value === '') {
+    if (field.requiredYn === 'Y') {
+      throw new Error(`필수 필드 값이 없습니다: ${field.targetName}`)
+    }
+
+    return null
+  }
+
+  // 2. 설정한 데이터 타입에 맞게 변환한다.
+  switch (field.dataType) {
+    case 'STRING':
+      return typeof value === 'object' ? JSON.stringify(value) : String(value)
+
+    case 'INTEGER': {
+      if (typeof value === 'boolean' || typeof value === 'object') {
+        throw new Error(`정수 변환에 실패했습니다: ${field.targetName}`)
+      }
+
+      const number = Number(value)
+
+      if (!Number.isSafeInteger(number)) {
+        throw new Error(`정수 변환에 실패했습니다: ${field.targetName}`)
+      }
+
+      return number
+    }
+
+    case 'DECIMAL': {
+      if (typeof value === 'boolean' || typeof value === 'object') {
+        throw new Error(`실수 변환에 실패했습니다: ${field.targetName}`)
+      }
+
+      const number = Number(value)
+
+      if (!Number.isFinite(number)) {
+        throw new Error(`실수 변환에 실패했습니다: ${field.targetName}`)
+      }
+
+      return number
+    }
+
+    case 'BOOLEAN':
+      if (typeof value === 'boolean') {
+        return value
+      }
+
+      if (value === 1 || value === '1' || value === 'true') {
+        return true
+      }
+
+      if (value === 0 || value === '0' || value === 'false') {
+        return false
+      }
+
+      throw new Error(`BOOLEAN 변환에 실패했습니다: ${field.targetName}`)
+
+    case 'DATETIME': {
+      if (field.valueFormat === 'EPOCH_MILLIS') {
+        if (typeof value === 'boolean' || typeof value === 'object' || !String(value).trim()) {
+          throw new Error(`날짜 변환에 실패했습니다: ${field.targetName}`)
+        }
+
+        const millis = Number(value)
+        const date = new Date(millis)
+
+        if (!Number.isFinite(millis) || Number.isNaN(date.getTime())) {
+          throw new Error(`날짜 변환에 실패했습니다: ${field.targetName}`)
+        }
+
+        return date.toISOString()
+      }
+
+      if (field.valueFormat === 'ISO_DATETIME') {
+        if (
+          typeof value !== 'string' ||
+          !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?$/.test(
+            value,
+          ) ||
+          Number.isNaN(Date.parse(value))
+        ) {
+          throw new Error(`날짜 형식이 올바르지 않습니다: ${field.targetName}`)
+        }
+
+        return value
+      }
+
+      throw new Error(`날짜 입력 형식을 선택해주세요: ${field.targetName}`)
+    }
+
+    default:
+      throw new Error(`지원하지 않는 데이터 타입입니다: ${field.dataType}`)
+  }
+}
+
+// JSON 가공 결과 미리보기
+const previewTransformRule = () => {
+  previewResult.value = null
+  previewError.value = ''
+  isPreviewed.value = false
+
+  // 1. 입력값과 샘플 데이터 형식을 검증한다.
+  if (!validateForm()) {
+    return
+  }
+
+  if (version.value.dataFormat !== 'JSON') {
+    previewError.value = '현재 미리보기는 JSON 형식만 지원합니다.'
+    return
+  }
+
+  try {
+    // 2. 반복 경로에 해당하는 데이터를 조회한다.
+    const sample = parsedSample.value.value
+    const repeatPath = version.value.repeatPath.trim()
+    const target = repeatPath ? getSourceValue(sample, repeatPath) : sample
+
+    if (target === null || target === undefined) {
+      throw new Error('반복 경로에 해당하는 데이터가 없습니다.')
+    }
+
+    if (repeatPath && !Array.isArray(target)) {
+      throw new Error('반복 경로는 JSON 배열을 가리켜야 합니다.')
+    }
+
+    const targets = Array.isArray(target) ? target : [target]
+
+    // 3. 각 데이터에 필드 추출 및 타입 변환을 적용한다.
+    const results = targets.map((item, index) => {
+      if (item === null || typeof item !== 'object' || Array.isArray(item)) {
+        throw new Error(`${index + 1}번째 가공 대상은 JSON 객체여야 합니다.`)
+      }
+
+      const entries = fields.value.map((field) => {
+        const value = getSourceValue(item, field.sourcePath.trim())
+
+        try {
+          return [field.targetName.trim(), convertFieldValue(value, field)]
+        } catch (error) {
+          throw new Error(`${index + 1}번째 데이터: ${error.message}`)
+        }
+      })
+
+      return Object.fromEntries(entries)
+    })
+
+    // 4. 가공 결과를 화면에 설정한다.
+    previewResult.value = Array.isArray(target) ? results : results[0]
+    isPreviewed.value = true
+  } catch (error) {
+    console.error('가공 결과 미리보기 실패:', error)
+    previewError.value = error.message || '가공 결과 미리보기에 실패했습니다.'
+  }
+}
+
+// 입력값 변경 시 이전 미리보기 결과를 초기화한다.
+watch(
+  [sampleData, version, fields],
+  () => {
+    previewResult.value = null
+    previewError.value = ''
+    isPreviewed.value = false
+  },
+  { deep: true },
+)
 
 const addTransformRule = async () => {
   // 1. 중복 등록 및 입력값을 검증한다.
@@ -314,8 +498,8 @@ const addTransformRule = async () => {
       />
 
       <p class="mt-2 text-xs text-gray-500">
-        반복 경로는 선택 사항입니다. 지정하지 않으면 원본 전체를 기준으로 결과 한 건을 생성합니다.
-        경로는 추후 미리보기 기능에서 검증합니다.
+        반복 경로는 선택 사항입니다. 지정하지 않으면 최상위 객체는 1건, 최상위 배열은 요소별로
+        가공합니다. 반복 경로를 지정하는 경우 JSON 배열을 가리켜야 합니다.
       </p>
     </section>
 
@@ -425,10 +609,68 @@ const addTransformRule = async () => {
       </div>
     </section>
 
+    <!-- 가공 결과 미리보기 -->
+    <section class="rounded-lg border border-gray-200 bg-white p-5">
+      <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 class="text-base font-semibold text-gray-900">가공 결과 미리보기</h3>
+
+          <p class="mt-1 text-xs text-gray-500">
+            샘플 JSON에 추출 경로와 데이터 타입 설정을 적용합니다.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          :disabled="isSaving || version.dataFormat !== 'JSON'"
+          class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+          @click="previewTransformRule"
+        >
+          미리보기 실행
+        </button>
+      </div>
+
+      <p v-if="version.dataFormat === 'XML'" class="text-sm text-gray-500">
+        XML 가공 미리보기는 추후 지원합니다.
+      </p>
+
+      <!-- 미리보기 오류 -->
+      <div
+        v-if="previewError"
+        class="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+      >
+        {{ previewError }}
+      </div>
+
+      <!-- 가공 결과 -->
+      <div v-if="isPreviewed">
+        <div class="mb-3 flex items-center justify-between">
+          <span class="text-sm font-medium text-green-700"> 가공이 완료되었습니다. </span>
+
+          <span class="text-xs text-gray-500">
+            결과 {{ Array.isArray(previewResult) ? previewResult.length : 1 }}건
+          </span>
+        </div>
+
+        <pre
+          class="max-h-96 overflow-auto rounded-md border border-gray-200 bg-gray-50 p-4 font-mono text-xs leading-6 text-gray-800"
+          >{{ JSON.stringify(previewResult, null, 2) }}</pre
+        >
+      </div>
+
+      <!-- 실행 전 -->
+      <div
+        v-else-if="!previewError && version.dataFormat === 'JSON'"
+        class="rounded-md border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500"
+      >
+        미리보기를 실행하면 가공된 JSON 결과가 표시됩니다.
+      </div>
+    </section>
+
     <!-- 안내 -->
     <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
-      현재는 규칙 설정만 저장합니다. 샘플 데이터에 대한 필드 경로 검증과 가공 결과 미리보기는 다음
-      단계에서 지원할 예정입니다.
+      현재는 가공 규칙 설정만 저장합니다. JSON 샘플 데이터의 가공 결과는 미리보기에서 확인할 수
+      있으며, 실제 Raw Data 가공 및 저장은 추후 지원합니다.
     </div>
 
     <!-- 오류 메시지 -->
