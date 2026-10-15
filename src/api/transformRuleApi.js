@@ -25,3 +25,7 @@ export const getTransformRuleVersionDetail = (transformRuleId, transformRuleVers
 export const createTransformRule = (requestData) => {
   return http.post('/transform-rule/add', requestData)
 }
+
+export const previewTransformRule = (requestData) => {
+  return http.post('/transform-rule/preview', requestData)
+}

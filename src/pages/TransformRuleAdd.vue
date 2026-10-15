@@ -1,7 +1,10 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { createTransformRule } from '@/api/transformRuleApi'
+import {
+  createTransformRule,
+  previewTransformRule as requestTransformPreview,
+} from '@/api/transformRuleApi'
 import { parseXmlTree } from '@/utils/xmlUtils'
 
 const router = useRouter()
@@ -27,6 +30,8 @@ const fields = ref([])
 const previewResult = ref(null)
 const previewError = ref('')
 const isPreviewed = ref(false)
+const isPreviewing = ref(false)
+let previewRequestId = 0
 
 const inputClass =
   'w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-gray-500'
@@ -154,118 +159,13 @@ const validateForm = () => {
   return true
 }
 
-const getSourceValue = (data, sourcePath) => {
-  return sourcePath.split('.').reduce((value, key) => {
-    if (value === null || value === undefined || typeof value !== 'object') {
-      return undefined
-    }
-
-    if (!Object.hasOwn(value, key)) {
-      return undefined
-    }
-
-    return value[key]
-  }, data)
-}
-
-const convertFieldValue = (value, field) => {
-  // 1. 필수 필드 여부를 확인한다.
-  if (value === null || value === undefined || value === '') {
-    if (field.requiredYn === 'Y') {
-      throw new Error(`필수 필드 값이 없습니다: ${field.targetName}`)
-    }
-
-    return null
-  }
-
-  // 2. 설정한 데이터 타입에 맞게 변환한다.
-  switch (field.dataType) {
-    case 'STRING':
-      return typeof value === 'object' ? JSON.stringify(value) : String(value)
-
-    case 'INTEGER': {
-      if (typeof value === 'boolean' || typeof value === 'object') {
-        throw new Error(`정수 변환에 실패했습니다: ${field.targetName}`)
-      }
-
-      const number = Number(value)
-
-      if (!Number.isSafeInteger(number)) {
-        throw new Error(`정수 변환에 실패했습니다: ${field.targetName}`)
-      }
-
-      return number
-    }
-
-    case 'DECIMAL': {
-      if (typeof value === 'boolean' || typeof value === 'object') {
-        throw new Error(`실수 변환에 실패했습니다: ${field.targetName}`)
-      }
-
-      const number = Number(value)
-
-      if (!Number.isFinite(number)) {
-        throw new Error(`실수 변환에 실패했습니다: ${field.targetName}`)
-      }
-
-      return number
-    }
-
-    case 'BOOLEAN':
-      if (typeof value === 'boolean') {
-        return value
-      }
-
-      if (value === 1 || value === '1' || value === 'true') {
-        return true
-      }
-
-      if (value === 0 || value === '0' || value === 'false') {
-        return false
-      }
-
-      throw new Error(`BOOLEAN 변환에 실패했습니다: ${field.targetName}`)
-
-    case 'DATETIME': {
-      if (field.valueFormat === 'EPOCH_MILLIS') {
-        if (typeof value === 'boolean' || typeof value === 'object' || !String(value).trim()) {
-          throw new Error(`날짜 변환에 실패했습니다: ${field.targetName}`)
-        }
-
-        const millis = Number(value)
-        const date = new Date(millis)
-
-        if (!Number.isFinite(millis) || Number.isNaN(date.getTime())) {
-          throw new Error(`날짜 변환에 실패했습니다: ${field.targetName}`)
-        }
-
-        return date.toISOString()
-      }
-
-      if (field.valueFormat === 'ISO_DATETIME') {
-        if (
-          typeof value !== 'string' ||
-          !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?$/.test(
-            value,
-          ) ||
-          Number.isNaN(Date.parse(value))
-        ) {
-          throw new Error(`날짜 형식이 올바르지 않습니다: ${field.targetName}`)
-        }
-
-        return value
-      }
-
-      throw new Error(`날짜 입력 형식을 선택해주세요: ${field.targetName}`)
-    }
-
-    default:
-      throw new Error(`지원하지 않는 데이터 타입입니다: ${field.dataType}`)
-  }
-}
-
 // JSON 가공 결과 미리보기
-const previewTransformRule = () => {
+
+const previewTransformRule = async () => {
+  if (isSaving.value || isPreviewing.value) {
+    return
+  }
+
   previewResult.value = null
   previewError.value = ''
   isPreviewed.value = false
@@ -280,60 +180,52 @@ const previewTransformRule = () => {
     return
   }
 
+  // 2. 미리보기 요청 데이터를 생성한다.
+  const requestData = {
+    rawData: sampleData.value,
+    version: {
+      dataFormat: version.value.dataFormat,
+      repeatPath: version.value.repeatPath.trim() || null,
+    },
+    fields: fields.value.map((field, index) => ({
+      sourcePath: field.sourcePath.trim(),
+      targetName: field.targetName.trim(),
+      dataType: field.dataType,
+      valueFormat: field.dataType === 'DATETIME' ? field.valueFormat.trim() || null : null,
+      requiredYn: field.requiredYn,
+      sortOrder: index,
+    })),
+  }
+
+  const requestId = ++previewRequestId
+  isPreviewing.value = true
+
   try {
-    // 2. 반복 경로에 해당하는 데이터를 조회한다.
-    const sample = parsedSample.value.value
-    const repeatPath = version.value.repeatPath.trim()
-    const target = repeatPath ? getSourceValue(sample, repeatPath) : sample
+    // 3. 백엔드 가공 엔진을 호출한다.
+    const response = await requestTransformPreview(requestData)
 
-    if (target === null || target === undefined) {
-      throw new Error('반복 경로에 해당하는 데이터가 없습니다.')
+    if (requestId !== previewRequestId) {
+      return
     }
-
-    if (repeatPath && !Array.isArray(target)) {
-      throw new Error('반복 경로는 JSON 배열을 가리켜야 합니다.')
-    }
-
-    const targets = Array.isArray(target) ? target : [target]
-
-    // 3. 각 데이터에 필드 추출 및 타입 변환을 적용한다.
-    const results = targets.map((item, index) => {
-      if (item === null || typeof item !== 'object' || Array.isArray(item)) {
-        throw new Error(`${index + 1}번째 가공 대상은 JSON 객체여야 합니다.`)
-      }
-
-      const entries = fields.value.map((field) => {
-        const value = getSourceValue(item, field.sourcePath.trim())
-
-        try {
-          return [field.targetName.trim(), convertFieldValue(value, field)]
-        } catch (error) {
-          throw new Error(`${index + 1}번째 데이터: ${error.message}`)
-        }
-      })
-
-      return Object.fromEntries(entries)
-    })
 
     // 4. 가공 결과를 화면에 설정한다.
-    previewResult.value = Array.isArray(target) ? results : results[0]
+    previewResult.value = response.data
     isPreviewed.value = true
   } catch (error) {
+    if (requestId !== previewRequestId) {
+      return
+    }
+
     console.error('가공 결과 미리보기 실패:', error)
-    previewError.value = error.message || '가공 결과 미리보기에 실패했습니다.'
+
+    previewError.value =
+      typeof error.response?.data === 'string'
+        ? error.response.data
+        : '가공 결과 미리보기에 실패했습니다.'
+  } finally {
+    isPreviewing.value = false
   }
 }
-
-// 입력값 변경 시 이전 미리보기 결과를 초기화한다.
-watch(
-  [sampleData, version, fields],
-  () => {
-    previewResult.value = null
-    previewError.value = ''
-    isPreviewed.value = false
-  },
-  { deep: true },
-)
 
 const addTransformRule = async () => {
   // 1. 중복 등록 및 입력값을 검증한다.
@@ -386,6 +278,18 @@ const addTransformRule = async () => {
     isSaving.value = false
   }
 }
+
+// 입력값 변경 시 이전 미리보기 결과를 초기화한다.
+watch(
+  [sampleData, version, fields],
+  () => {
+    previewRequestId++
+    previewResult.value = null
+    previewError.value = ''
+    isPreviewed.value = false
+  },
+  { deep: true },
+)
 </script>
 
 <template>
@@ -622,11 +526,11 @@ const addTransformRule = async () => {
 
         <button
           type="button"
-          :disabled="isSaving || version.dataFormat !== 'JSON'"
+          :disabled="isSaving || isPreviewing || version.dataFormat !== 'JSON'"
           class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           @click="previewTransformRule"
         >
-          미리보기 실행
+          {{ isPreviewing ? '가공 중...' : '미리보기 실행' }}
         </button>
       </div>
 
