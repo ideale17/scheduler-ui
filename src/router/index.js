@@ -19,6 +19,7 @@ import RawDataDetail from '@/pages/RawDataDetail.vue'
 import TransformRuleList from '@/pages/TransformRuleList.vue'
 import TransformRuleDetail from '@/pages/TransformRuleDetail.vue'
 import TransformRuleAdd from '@/pages/TransformRuleAdd.vue'
+import TransformTaskList from '@/pages/TransformTaskList.vue'
 
 const routes = [
   { path: '/login', component: LoginView, meta: { requiresAuth: false, public: true } },
@@ -121,6 +122,14 @@ const routes = [
         component: TransformRuleAdd,
         meta: {
           title: '가공 규칙 등록',
+          requiresAuth: true,
+        },
+      },
+      {
+        path: 'transform-task',
+        component: TransformTaskList,
+        meta: {
+          title: '가공 대상 관리',
           requiresAuth: true,
         },
       },

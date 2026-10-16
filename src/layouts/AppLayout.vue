@@ -23,8 +23,14 @@ const menuGroups = [
     menus: [
       { to: '/externalApi', label: 'API 관리', match: 'externalApi' },
       { to: '/externalApi/history', label: 'API 실행 이력', match: 'externalApiHistory' },
+    ],
+  },
+  {
+    label: 'DATA PROCESSING',
+    menus: [
       { to: '/raw-data', label: 'Raw Data 관리', match: 'rawData' },
       { to: '/transform-rule', label: '가공 규칙 관리', match: 'transformRule' },
+      { to: '/transform-task', label: '가공 대상 관리', match: 'transformTask' },
     ],
   },
   {
@@ -54,10 +60,13 @@ const isActive = (menu) => {
       return route.path === '/externalApi/history'
 
     case 'rawData':
-      return route.path === '/raw-data'
+      return route.path === '/raw-data' || route.path.startsWith('/raw-data/')
 
     case 'transformRule':
       return route.path === '/transform-rule' || route.path.startsWith('/transform-rule/')
+
+    case 'transformTask':
+      return route.path === '/transform-task'
 
     case 'schedulerInfo':
       return route.path === '/schedulerInfo'
