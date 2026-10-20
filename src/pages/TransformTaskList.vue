@@ -124,6 +124,9 @@ const fetchRawDataList = async () => {
   try {
     const response = await getRawDataList({
       externalApiId: Number(selectedExternalApiId.value),
+      transformRuleId: selectedTransformRuleId.value
+        ? Number(selectedTransformRuleId.value)
+        : undefined,
       page: currentPage.value,
       size: pageSize,
     })
@@ -165,9 +168,12 @@ const changeExternalApi = async () => {
 }
 
 // 가공 규칙 변경
-const changeTransformRule = () => {
-  // 규칙이 변경되면 기존 선택 대상을 초기화한다.
+const changeTransformRule = async () => {
+  // 1. 규칙이 변경되면 기존 선택 대상을 초기화한다.
   selectedRawDataIds.value = []
+
+  // 2. 선택한 규칙에 해당하는 최신 가공 상태를 다시 조회한다.
+  await fetchRawDataList()
 }
 
 // 개별 Raw Data 선택
@@ -274,11 +280,29 @@ const registerTransformTasks = async () => {
     selectedRawDataIds.value = []
 
     alert(`${transformTaskIds.length}건의 가공 작업이 대기 상태로 등록되었습니다.`)
+
+    await fetchRawDataList()
   } catch (error) {
     console.error('가공 작업 등록 실패:', error)
     alert('가공 작업 등록에 실패했습니다.')
   } finally {
     isRegistering.value = false
+  }
+}
+
+// 가공 작업 상태에 따른 표시 정보
+const getTransformStatus = (status) => {
+  switch (status) {
+    case 'PENDING':
+      return { label: '대기', className: 'bg-gray-100 text-gray-700' }
+    case 'RUNNING':
+      return { label: '진행 중', className: 'bg-blue-50 text-blue-700' }
+    case 'SUCCESS':
+      return { label: '성공', className: 'bg-green-50 text-green-700' }
+    case 'FAILED':
+      return { label: '실패', className: 'bg-red-50 text-red-700' }
+    default:
+      return { label: '미가공', className: 'bg-gray-50 text-gray-500' }
   }
 }
 
@@ -423,7 +447,7 @@ onUnmounted(() => {
 
       <!-- 목록 -->
       <div v-else class="overflow-x-auto">
-        <table class="w-full min-w-[800px] text-left text-sm">
+        <table class="w-full min-w-[900px] text-left text-sm">
           <thead class="bg-gray-50 text-gray-600">
             <tr>
               <th class="px-4 py-3">
@@ -439,6 +463,7 @@ onUnmounted(() => {
               <th class="px-4 py-3">API명</th>
               <th class="px-4 py-3">요청 순번</th>
               <th class="px-4 py-3">Content-Type</th>
+              <th class="px-4 py-3">가공 상태</th>
               <th class="px-4 py-3">수집 일시</th>
               <th class="px-4 py-3">원본</th>
             </tr>
@@ -471,6 +496,20 @@ onUnmounted(() => {
                 {{ item.contentType || '-' }}
               </td>
 
+              <td class="px-4 py-3">
+                <span
+                  v-if="selectedTransformRuleId"
+                  :class="[
+                    'inline-flex rounded-md px-2 py-1 text-xs font-medium',
+                    getTransformStatus(item.transformStatus).className,
+                  ]"
+                >
+                  {{ getTransformStatus(item.transformStatus).label }}
+                </span>
+
+                <span v-else class="text-gray-400">-</span>
+              </td>
+
               <td class="px-4 py-3 text-gray-700">
                 {{ formatDateTime(item.collectedAt) }}
               </td>
@@ -487,7 +526,7 @@ onUnmounted(() => {
             </tr>
 
             <tr v-if="rawDataList.length === 0">
-              <td colspan="7" class="px-4 py-8 text-center text-gray-500">
+              <td colspan="8" class="px-4 py-8 text-center text-gray-500">
                 조회된 Raw Data가 없습니다.
               </td>
             </tr>
