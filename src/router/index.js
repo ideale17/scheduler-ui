@@ -20,6 +20,7 @@ import TransformRuleList from '@/pages/TransformRuleList.vue'
 import TransformRuleDetail from '@/pages/TransformRuleDetail.vue'
 import TransformRuleAdd from '@/pages/TransformRuleAdd.vue'
 import TransformTaskList from '@/pages/TransformTaskList.vue'
+import TransformResultList from '@/pages/TransformResultList.vue'
 
 const routes = [
   { path: '/login', component: LoginView, meta: { requiresAuth: false, public: true } },
@@ -130,6 +131,14 @@ const routes = [
         component: TransformTaskList,
         meta: {
           title: '가공 대상 관리',
+          requiresAuth: true,
+        },
+      },
+      {
+        path: 'transform-result',
+        component: TransformResultList,
+        meta: {
+          title: '가공 결과',
           requiresAuth: true,
         },
       },

@@ -31,6 +31,7 @@ const menuGroups = [
       { to: '/raw-data', label: 'Raw Data 관리', match: 'rawData' },
       { to: '/transform-rule', label: '가공 규칙 관리', match: 'transformRule' },
       { to: '/transform-task', label: '가공 대상 관리', match: 'transformTask' },
+      { to: '/transform-result', label: '가공 결과', match: 'transformResult' },
     ],
   },
   {
@@ -67,6 +68,9 @@ const isActive = (menu) => {
 
     case 'transformTask':
       return route.path === '/transform-task'
+
+    case 'transformResult':
+      return route.path === '/transform-result'
 
     case 'schedulerInfo':
       return route.path === '/schedulerInfo'
