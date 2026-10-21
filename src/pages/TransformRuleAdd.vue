@@ -160,7 +160,6 @@ const validateForm = () => {
 }
 
 // JSON 가공 결과 미리보기
-
 const previewTransformRule = async () => {
   if (isSaving.value || isPreviewing.value) {
     return
@@ -172,11 +171,6 @@ const previewTransformRule = async () => {
 
   // 1. 입력값과 샘플 데이터 형식을 검증한다.
   if (!validateForm()) {
-    return
-  }
-
-  if (version.value.dataFormat !== 'JSON') {
-    previewError.value = '현재 미리보기는 JSON 형식만 지원합니다.'
     return
   }
 
@@ -520,23 +514,19 @@ watch(
           <h3 class="text-base font-semibold text-gray-900">가공 결과 미리보기</h3>
 
           <p class="mt-1 text-xs text-gray-500">
-            샘플 JSON에 추출 경로와 데이터 타입 설정을 적용합니다.
+            샘플 JSON/XML에 추출 경로와 데이터 타입 설정을 적용합니다.
           </p>
         </div>
 
         <button
           type="button"
-          :disabled="isSaving || isPreviewing || version.dataFormat !== 'JSON'"
+          :disabled="isSaving || isPreviewing"
           class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           @click="previewTransformRule"
         >
           {{ isPreviewing ? '가공 중...' : '미리보기 실행' }}
         </button>
       </div>
-
-      <p v-if="version.dataFormat === 'XML'" class="text-sm text-gray-500">
-        XML 가공 미리보기는 추후 지원합니다.
-      </p>
 
       <!-- 미리보기 오류 -->
       <div
@@ -564,7 +554,7 @@ watch(
 
       <!-- 실행 전 -->
       <div
-        v-else-if="!previewError && version.dataFormat === 'JSON'"
+        v-else-if="!previewError"
         class="rounded-md border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500"
       >
         미리보기를 실행하면 가공된 JSON 결과가 표시됩니다.

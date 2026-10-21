@@ -284,7 +284,13 @@ const registerTransformTasks = async () => {
     await fetchRawDataList()
   } catch (error) {
     console.error('가공 작업 등록 실패:', error)
-    alert('가공 작업 등록에 실패했습니다.')
+
+    const errorMessage =
+      typeof error.response?.data === 'string'
+        ? error.response.data
+        : error.message || '가공 작업 등록에 실패했습니다.'
+
+    alert(errorMessage)
   } finally {
     isRegistering.value = false
   }
