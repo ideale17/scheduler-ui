@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { getExternalApiList } from '@/api/externalApi'
 import { getRawDataList } from '@/api/rawDataApi'
 import { getTransformRuleList } from '@/api/transformRuleApi'
-import { createManualTransformTasks } from '@/api/transformTaskApi'
+import { createManualTransformTasks, getTransformTaskHistory } from '@/api/transformTaskApi'
 
 // 화면 상태
 const router = useRouter()
@@ -33,6 +33,15 @@ const totalCount = ref(0)
 // API 변경 중 이전 요청 결과가 반영되지 않도록 관리한다.
 let rawDataRequestId = 0
 
+// 가공 이력 펼침 영역 상태
+const expandedRawDataId = ref(null)
+const transformTaskHistory = ref([])
+const isHistoryLoading = ref(false)
+const historyErrorMessage = ref('')
+
+// 이전 가공 이력 조회 응답을 무시하기 위한 식별자
+let historyRequestId = 0
+
 // 페이징 계산
 const totalPages = computed(() => {
   if (totalCount.value === 0) {
@@ -42,9 +51,20 @@ const totalPages = computed(() => {
   return Math.ceil(totalCount.value / pageSize)
 })
 
-// 현재 페이지 Raw Data ID 목록
+// 현재 규칙 버전으로 가공 작업을 등록할 수 있는지 확인
+const isRawDataSelectable = (item) => {
+  // 1. External API와 가공 규칙이 선택되었는지 확인한다.
+  if (!selectedExternalApiId.value || !selectedTransformRuleId.value) {
+    return false
+  }
+
+  // 2. 서버에서 반환한 가공 등록 제한 여부를 확인한다.
+  return item.transformBlocked === 0
+}
+
+// 현재 페이지에서 선택 가능한 Raw Data ID 목록
 const currentPageRawDataIds = computed(() => {
-  return rawDataList.value.map((item) => item.rawDataId)
+  return rawDataList.value.filter(isRawDataSelectable).map((item) => item.rawDataId)
 })
 
 // 현재 페이지 전체 선택 여부
@@ -109,7 +129,7 @@ const fetchTransformRuleList = async () => {
 const fetchRawDataList = async () => {
   const requestId = ++rawDataRequestId
 
-  // External API가 선택되지 않은 경우 목록을 비운다.
+  // 1. External API가 선택되지 않은 경우 목록을 비운다.
   if (!selectedExternalApiId.value) {
     rawDataList.value = []
     totalCount.value = 0
@@ -122,6 +142,7 @@ const fetchRawDataList = async () => {
   rawDataErrorMessage.value = ''
 
   try {
+    // 2. 선택한 API와 규칙 기준으로 Raw Data를 조회한다.
     const response = await getRawDataList({
       externalApiId: Number(selectedExternalApiId.value),
       transformRuleId: selectedTransformRuleId.value
@@ -131,12 +152,14 @@ const fetchRawDataList = async () => {
       size: pageSize,
     })
 
-    // 이전 External API 또는 페이지 조회 응답은 무시한다.
+    // 3. 이전 요청의 응답은 무시한다.
     if (requestId !== rawDataRequestId) {
       return
     }
 
+    // 4. 조회 결과와 페이징 정보를 반영한다.
     rawDataList.value = Array.isArray(response.data.content) ? response.data.content : []
+
     totalCount.value = Number(response.data.totalCount || 0)
   } catch (error) {
     if (requestId !== rawDataRequestId) {
@@ -157,27 +180,47 @@ const fetchRawDataList = async () => {
 
 // External API 변경
 const changeExternalApi = async () => {
+  // 1. 페이지와 선택한 데이터를 초기화한다.
   currentPage.value = 1
   selectedRawDataIds.value = []
 
-  // 새 API 조회 전 이전 목록을 초기화한다.
+  // 2. 이전 가공 이력 펼침 상태를 초기화한다.
+  clearTransformTaskHistory()
+
+  // 3. 새 조회 전에 이전 목록을 초기화한다.
   rawDataList.value = []
   totalCount.value = 0
 
+  // 4. 새 External API의 Raw Data를 조회한다.
   await fetchRawDataList()
 }
 
 // 가공 규칙 변경
 const changeTransformRule = async () => {
-  // 1. 규칙이 변경되면 기존 선택 대상을 초기화한다.
+  // 1. 선택한 데이터를 초기화한다.
   selectedRawDataIds.value = []
 
-  // 2. 선택한 규칙에 해당하는 최신 가공 상태를 다시 조회한다.
+  // 2. 첫 페이지로 이동한다.
+  currentPage.value = 1
+
+  // 3. 가공 이력 펼침 상태를 초기화한다.
+  clearTransformTaskHistory()
+
+  // 4. 새 규칙의 현재 버전 기준으로 다시 조회한다.
   await fetchRawDataList()
 }
 
 // 개별 Raw Data 선택
 const toggleRawDataSelection = (rawDataId) => {
+  // 1. 현재 목록에서 선택 대상 정보를 찾는다.
+  const rawData = rawDataList.value.find((item) => item.rawDataId === rawDataId)
+
+  // 2. 등록 중이거나 가공 불가능한 데이터는 선택하지 않는다.
+  if (isRegistering.value || !rawData || !isRawDataSelectable(rawData)) {
+    return
+  }
+
+  // 3. 이미 선택한 데이터면 해제한다.
   if (selectedRawDataIds.value.includes(rawDataId)) {
     selectedRawDataIds.value = selectedRawDataIds.value.filter(
       (selectedId) => selectedId !== rawDataId,
@@ -185,11 +228,36 @@ const toggleRawDataSelection = (rawDataId) => {
     return
   }
 
+  // 4. 선택 가능한 Raw Data를 추가한다.
   selectedRawDataIds.value = [...selectedRawDataIds.value, rawDataId]
+}
+
+// 등록 대상 목록에서 선택한 Raw Data 제거
+const removeSelectedRawData = (rawDataId) => {
+  // 1. 가공 작업 등록 중에는 선택 목록을 변경하지 않는다.
+  if (isRegistering.value) {
+    return
+  }
+
+  // 2. 선택한 Raw Data 목록에서 해당 식별자를 제거한다.
+  selectedRawDataIds.value = selectedRawDataIds.value.filter(
+    (selectedId) => selectedId !== rawDataId,
+  )
 }
 
 // 현재 페이지 전체 선택 및 해제
 const toggleCurrentPageSelection = () => {
+  // 1. 등록 중에는 선택을 변경하지 않는다.
+  if (isRegistering.value) {
+    return
+  }
+
+  // 2. 선택 가능한 데이터가 없다면 종료한다.
+  if (currentPageRawDataIds.value.length === 0) {
+    return
+  }
+
+  // 3. 모두 선택된 경우 현재 페이지의 선택을 해제한다.
   if (isCurrentPageSelected.value) {
     selectedRawDataIds.value = selectedRawDataIds.value.filter(
       (rawDataId) => !currentPageRawDataIds.value.includes(rawDataId),
@@ -197,30 +265,102 @@ const toggleCurrentPageSelection = () => {
     return
   }
 
+  // 4. 현재 페이지에서 선택 가능한 데이터만 추가한다.
   selectedRawDataIds.value = [
     ...new Set([...selectedRawDataIds.value, ...currentPageRawDataIds.value]),
   ]
 }
 
-// 전체 선택 해제
-const clearSelection = () => {
-  selectedRawDataIds.value = []
-}
-
 // 페이지 변경
 const changePage = async (page) => {
-  if (page < 1 || page > totalPages.value || page === currentPage.value || isRawDataLoading.value) {
+  // 1. 페이지 변경 가능 여부를 확인한다.
+  if (
+    page < 1 ||
+    page > totalPages.value ||
+    page === currentPage.value ||
+    isRawDataLoading.value ||
+    isRegistering.value
+  ) {
     return
   }
 
+  // 2. 이전 가공 이력 영역을 초기화한다.
+  clearTransformTaskHistory()
+
+  // 3. 페이지를 변경한다.
   currentPage.value = page
 
+  // 4. 변경한 페이지의 목록을 조회한다.
   await fetchRawDataList()
 }
 
 // Raw Data 상세 이동
 const goRawDataDetail = (rawDataId) => {
   router.push(`/raw-data/${rawDataId}`)
+}
+
+// 가공 이력 펼침 상태 초기화
+const clearTransformTaskHistory = () => {
+  // 1. 진행 중인 이전 조회 응답을 무효화한다.
+  historyRequestId++
+
+  // 2. 펼침 상태와 이력 데이터를 초기화한다.
+  expandedRawDataId.value = null
+  transformTaskHistory.value = []
+
+  // 3. 로딩 및 오류 상태를 초기화한다.
+  isHistoryLoading.value = false
+  historyErrorMessage.value = ''
+}
+
+// Raw Data별 가공 작업 이력 펼침 및 조회
+const toggleTransformTaskHistory = async (rawDataId) => {
+  // 1. 이미 펼쳐진 행을 다시 클릭하면 닫는다.
+  if (expandedRawDataId.value === rawDataId) {
+    clearTransformTaskHistory()
+    return
+  }
+
+  // 2. 새로운 조회 요청을 시작한다.
+  const requestId = ++historyRequestId
+
+  expandedRawDataId.value = rawDataId
+  transformTaskHistory.value = []
+  isHistoryLoading.value = true
+  historyErrorMessage.value = ''
+
+  try {
+    // 3. 선택한 Raw Data의 전체 가공 이력을 조회한다.
+    const response = await getTransformTaskHistory(rawDataId)
+
+    // 4. 현재 요청이 아니라면 응답을 무시한다.
+    if (requestId !== historyRequestId) {
+      return
+    }
+
+    // 5. 조회된 이력을 화면에 반영한다.
+    transformTaskHistory.value = Array.isArray(response.data) ? response.data : []
+  } catch (error) {
+    if (requestId !== historyRequestId) {
+      return
+    }
+
+    console.error('가공 작업 이력 조회 실패:', error)
+
+    historyErrorMessage.value =
+      typeof error.response?.data === 'string'
+        ? error.response.data
+        : '가공 작업 이력을 불러오지 못했습니다.'
+  } finally {
+    if (requestId === historyRequestId) {
+      isHistoryLoading.value = false
+    }
+  }
+}
+
+// 가공 결과 상세 화면으로 이동
+const goTransformResultDetail = (transformResultId) => {
+  router.push(`/transform-result/${transformResultId}`)
 }
 
 // 날짜 표시
@@ -232,6 +372,7 @@ const formatDateTime = (dateTime) => {
   return String(dateTime).replace('T', ' ').substring(0, 19)
 }
 
+// 수동 가공 작업 등록
 const registerTransformTasks = async () => {
   // 1. 필수 입력값을 검증한다.
   if (!selectedExternalApiId.value || !selectedTransformRuleId.value) {
@@ -249,10 +390,11 @@ const registerTransformTasks = async () => {
     return
   }
 
-  if (isRegistering.value) {
+  if (isRegistering.value || isRawDataLoading.value) {
     return
   }
 
+  // 2. 가공 작업 등록 여부를 확인한다.
   if (
     !confirm(
       `선택한 Raw Data ${selectedRawDataIds.value.length}건을 가공 작업으로 등록하시겠습니까?`,
@@ -261,7 +403,7 @@ const registerTransformTasks = async () => {
     return
   }
 
-  // 2. 수동 가공 작업을 등록한다.
+  // 3. 가공 작업을 등록한다.
   isRegistering.value = true
 
   try {
@@ -270,17 +412,20 @@ const registerTransformTasks = async () => {
       rawDataIds: [...selectedRawDataIds.value],
     })
 
-    // 3. 등록 결과를 확인한다.
+    // 4. 등록 결과를 확인한다.
     const transformTaskIds = response.data
 
     if (!Array.isArray(transformTaskIds)) {
       throw new Error('가공 작업 등록 응답 형식이 올바르지 않습니다.')
     }
 
+    // 5. 선택 및 이력 펼침 상태를 초기화한다.
     selectedRawDataIds.value = []
+    clearTransformTaskHistory()
 
     alert(`${transformTaskIds.length}건의 가공 작업이 대기 상태로 등록되었습니다.`)
 
+    // 6. 최신 가공 가능 여부와 이력 건수를 다시 조회한다.
     await fetchRawDataList()
   } catch (error) {
     console.error('가공 작업 등록 실패:', error)
@@ -320,13 +465,16 @@ onMounted(async () => {
 // 화면 종료 후 이전 요청 결과 반영 방지
 onUnmounted(() => {
   rawDataRequestId++
+  historyRequestId++
 })
 </script>
 
 <template>
   <div class="space-y-4">
-    <!-- 검색 및 가공 규칙 선택 -->
+    <!-- ① 가공 작업 설정 -->
     <div class="rounded-lg border border-gray-200 bg-white p-4">
+      <h3 class="mb-4 text-sm font-semibold text-gray-900">① 가공 작업 설정</h3>
+
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
         <!-- External API 선택 -->
         <div>
@@ -337,7 +485,7 @@ onUnmounted(() => {
 
           <select
             v-model="selectedExternalApiId"
-            :disabled="isExternalApiLoading"
+            :disabled="isExternalApiLoading || isRegistering"
             class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-gray-500 disabled:bg-gray-100"
             @change="changeExternalApi"
           >
@@ -366,7 +514,7 @@ onUnmounted(() => {
 
           <select
             v-model="selectedTransformRuleId"
-            :disabled="isTransformRuleLoading"
+            :disabled="isTransformRuleLoading || isRegistering"
             class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-gray-500 disabled:bg-gray-100"
             @change="changeTransformRule"
           >
@@ -389,50 +537,23 @@ onUnmounted(() => {
       </div>
 
       <p class="mt-3 text-xs text-gray-500">
-        External API를 선택하면 해당 API에서 수집한 Raw Data가 표시됩니다. 가공 규칙은 실행 시 직접
-        선택합니다.
+        External API를 선택하면 해당 API에서 수집한 Raw Data가 표시됩니다. 가공 규칙은 현재 버전을
+        기준으로 적용됩니다.
       </p>
     </div>
 
-    <!-- 가공 대상 목록 -->
+    <!-- ② 가공 대상 선택 -->
     <div class="overflow-hidden rounded-lg border border-gray-200 bg-white">
       <!-- 목록 상단 -->
       <div
         class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-3"
       >
         <div>
-          <h3 class="text-sm font-semibold text-gray-900">가공 대상 Raw Data</h3>
+          <h3 class="text-sm font-semibold text-gray-900">② 가공 대상 선택</h3>
 
           <p class="mt-1 text-xs text-gray-500">
             전체 {{ totalCount }}건 / 선택 {{ selectedRawDataIds.length }}건
           </p>
-        </div>
-
-        <div class="flex items-center gap-2">
-          <button
-            type="button"
-            :disabled="selectedRawDataIds.length === 0"
-            class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-            @click="clearSelection"
-          >
-            선택 해제
-          </button>
-
-          <button
-            type="button"
-            :disabled="
-              isRegistering ||
-              isRawDataLoading ||
-              !selectedExternalApiId ||
-              !selectedTransformRuleId ||
-              selectedRawDataIds.length === 0 ||
-              selectedRawDataIds.length > 100
-            "
-            class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
-            @click="registerTransformTasks"
-          >
-            {{ isRegistering ? '등록 중...' : '선택 데이터 가공 등록' }}
-          </button>
         </div>
       </div>
 
@@ -451,7 +572,7 @@ onUnmounted(() => {
         {{ rawDataErrorMessage }}
       </div>
 
-      <!-- 목록 -->
+      <!-- 가공 대상 목록 -->
       <div v-else class="overflow-x-auto">
         <table class="w-full min-w-[900px] text-left text-sm">
           <thead class="bg-gray-50 text-gray-600">
@@ -460,77 +581,193 @@ onUnmounted(() => {
                 <input
                   type="checkbox"
                   :checked="isCurrentPageSelected"
-                  :disabled="rawDataList.length === 0"
-                  aria-label="현재 페이지 전체 선택"
+                  :disabled="
+                    currentPageRawDataIds.length === 0 || isRegistering || isRawDataLoading
+                  "
+                  aria-label="현재 페이지에서 가공 가능한 데이터 전체 선택"
                   @change="toggleCurrentPageSelection"
                 />
               </th>
+
               <th class="px-4 py-3">Raw Data ID</th>
               <th class="px-4 py-3">API명</th>
               <th class="px-4 py-3">요청 순번</th>
               <th class="px-4 py-3">Content-Type</th>
-              <th class="px-4 py-3">가공 상태</th>
+              <th class="px-4 py-3">가공 이력</th>
               <th class="px-4 py-3">수집 일시</th>
               <th class="px-4 py-3">원본</th>
             </tr>
           </thead>
 
           <tbody class="divide-y divide-gray-100">
-            <tr v-for="item in rawDataList" :key="item.rawDataId" class="hover:bg-gray-50">
-              <td class="px-4 py-3">
-                <input
-                  type="checkbox"
-                  :checked="selectedRawDataIds.includes(item.rawDataId)"
-                  :aria-label="`Raw Data ${item.rawDataId} 선택`"
-                  @change="toggleRawDataSelection(item.rawDataId)"
-                />
-              </td>
+            <template v-for="item in rawDataList" :key="item.rawDataId">
+              <!-- Raw Data 행 -->
+              <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3">
+                  <input
+                    type="checkbox"
+                    :checked="selectedRawDataIds.includes(item.rawDataId)"
+                    :disabled="!isRawDataSelectable(item) || isRegistering"
+                    :title="
+                      !selectedTransformRuleId
+                        ? '가공 규칙을 먼저 선택해 주세요.'
+                        : item.transformBlocked === 1
+                          ? '현재 규칙 버전에서 이미 등록되었거나 가공 완료된 데이터입니다.'
+                          : '가공 작업 등록 가능'
+                    "
+                    :aria-label="`Raw Data ${item.rawDataId} 선택`"
+                    @change="toggleRawDataSelection(item.rawDataId)"
+                  />
+                </td>
 
-              <td class="px-4 py-3 font-medium text-gray-900">
-                {{ item.rawDataId }}
-              </td>
+                <td class="px-4 py-3 font-medium text-gray-900">
+                  {{ item.rawDataId }}
+                </td>
 
-              <td class="px-4 py-3 text-gray-700">
-                {{ item.apiName || '-' }}
-              </td>
+                <td class="px-4 py-3 text-gray-700">
+                  {{ item.apiName || '-' }}
+                </td>
 
-              <td class="px-4 py-3 text-gray-700">
-                {{ item.requestSequence ?? '-' }}
-              </td>
+                <td class="px-4 py-3 text-gray-700">
+                  {{ item.requestSequence ?? '-' }}
+                </td>
 
-              <td class="px-4 py-3 text-gray-700">
-                {{ item.contentType || '-' }}
-              </td>
+                <td class="px-4 py-3 text-gray-700">
+                  {{ item.contentType || '-' }}
+                </td>
 
-              <td class="px-4 py-3">
-                <span
-                  v-if="selectedTransformRuleId"
-                  :class="[
-                    'inline-flex rounded-md px-2 py-1 text-xs font-medium',
-                    getTransformStatus(item.transformStatus).className,
-                  ]"
-                >
-                  {{ getTransformStatus(item.transformStatus).label }}
-                </span>
+                <!-- 전체 가공 작업 이력 -->
+                <td class="px-4 py-3">
+                  <button
+                    type="button"
+                    :disabled="!item.transformHistoryCount"
+                    :aria-expanded="expandedRawDataId === item.rawDataId"
+                    class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    @click="toggleTransformTaskHistory(item.rawDataId)"
+                  >
+                    {{ item.transformHistoryCount ?? 0 }}건
+                    {{ expandedRawDataId === item.rawDataId ? '▲' : '▼' }}
+                  </button>
+                </td>
 
-                <span v-else class="text-gray-400">-</span>
-              </td>
+                <td class="px-4 py-3 text-gray-700">
+                  {{ formatDateTime(item.collectedAt) }}
+                </td>
 
-              <td class="px-4 py-3 text-gray-700">
-                {{ formatDateTime(item.collectedAt) }}
-              </td>
+                <td class="px-4 py-3">
+                  <button
+                    type="button"
+                    class="text-blue-600 hover:underline"
+                    @click="goRawDataDetail(item.rawDataId)"
+                  >
+                    상세
+                  </button>
+                </td>
+              </tr>
 
-              <td class="px-4 py-3">
-                <button
-                  type="button"
-                  class="text-blue-600 hover:underline"
-                  @click="goRawDataDetail(item.rawDataId)"
-                >
-                  상세
-                </button>
-              </td>
-            </tr>
+              <!-- Raw Data별 가공 작업 이력 -->
+              <tr v-if="expandedRawDataId === item.rawDataId">
+                <td colspan="8" class="bg-gray-50 px-6 py-4">
+                  <div class="rounded-lg border border-gray-200 bg-white p-4">
+                    <h4 class="mb-3 text-sm font-semibold text-gray-900">
+                      Raw Data #{{ item.rawDataId }} 가공 이력
+                    </h4>
 
+                    <!-- 이력 조회 로딩 -->
+                    <p v-if="isHistoryLoading" class="text-sm text-gray-500">
+                      가공 이력을 불러오는 중입니다.
+                    </p>
+
+                    <!-- 이력 조회 오류 -->
+                    <p v-else-if="historyErrorMessage" class="text-sm text-red-600">
+                      {{ historyErrorMessage }}
+                    </p>
+
+                    <!-- 이력 목록 -->
+                    <div v-else class="overflow-x-auto">
+                      <table class="w-full text-sm">
+                        <thead class="bg-gray-50 text-gray-600">
+                          <tr>
+                            <th class="px-3 py-2 text-left">작업 ID</th>
+                            <th class="px-3 py-2 text-left">가공 규칙</th>
+                            <th class="px-3 py-2 text-left">버전</th>
+                            <th class="px-3 py-2 text-left">상태</th>
+                            <th class="px-3 py-2 text-left">시도 횟수</th>
+                            <th class="px-3 py-2 text-left">등록 일시</th>
+                            <th class="px-3 py-2 text-left">결과</th>
+                          </tr>
+                        </thead>
+
+                        <tbody class="divide-y divide-gray-100">
+                          <tr
+                            v-for="history in transformTaskHistory"
+                            :key="history.transformTaskId"
+                          >
+                            <td class="px-3 py-2">
+                              {{ history.transformTaskId }}
+                            </td>
+
+                            <td class="px-3 py-2">
+                              {{ history.ruleName }}
+                            </td>
+
+                            <td class="px-3 py-2">v{{ history.versionNo }}</td>
+
+                            <td class="px-3 py-2">
+                              <span
+                                :class="[
+                                  'inline-flex rounded-md px-2 py-1 text-xs font-medium',
+                                  getTransformStatus(history.status).className,
+                                ]"
+                              >
+                                {{ getTransformStatus(history.status).label }}
+                              </span>
+                            </td>
+
+                            <td class="px-3 py-2">
+                              {{ history.attemptCount ?? 0 }}
+                            </td>
+
+                            <td class="whitespace-nowrap px-3 py-2">
+                              {{ formatDateTime(history.createdAt) }}
+                            </td>
+
+                            <td class="px-3 py-2">
+                              <button
+                                v-if="history.status === 'SUCCESS' && history.transformResultId"
+                                type="button"
+                                class="text-blue-600 hover:underline"
+                                @click="goTransformResultDetail(history.transformResultId)"
+                              >
+                                결과 보기
+                              </button>
+
+                              <span
+                                v-else-if="history.status === 'FAILED'"
+                                class="block max-w-xs break-words text-xs text-red-600"
+                              >
+                                {{ history.errorMessage || '실패 원인 없음' }}
+                              </span>
+
+                              <span v-else class="text-gray-400">-</span>
+                            </td>
+                          </tr>
+
+                          <!-- 이력 없음 -->
+                          <tr v-if="transformTaskHistory.length === 0">
+                            <td colspan="7" class="px-3 py-6 text-center text-gray-500">
+                              등록된 가공 작업 이력이 없습니다.
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </template>
+
+            <!-- Raw Data 없음 -->
             <tr v-if="rawDataList.length === 0">
               <td colspan="8" class="px-4 py-8 text-center text-gray-500">
                 조회된 Raw Data가 없습니다.
@@ -550,7 +787,7 @@ onUnmounted(() => {
         <div class="flex gap-2">
           <button
             type="button"
-            :disabled="currentPage <= 1 || isRawDataLoading"
+            :disabled="currentPage <= 1 || isRawDataLoading || isRegistering"
             class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40"
             @click="changePage(currentPage - 1)"
           >
@@ -559,7 +796,7 @@ onUnmounted(() => {
 
           <button
             type="button"
-            :disabled="currentPage >= totalPages || isRawDataLoading"
+            :disabled="currentPage >= totalPages || isRawDataLoading || isRegistering"
             class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40"
             @click="changePage(currentPage + 1)"
           >
@@ -569,31 +806,90 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <!-- 가공 등록 안내 -->
+    <!-- ③ 가공 작업 등록 -->
     <div class="rounded-lg border border-gray-200 bg-white p-4">
-      <h3 class="mb-2 text-sm font-semibold text-gray-900">가공 작업 등록</h3>
+      <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h3 class="text-sm font-semibold text-gray-900">③ 가공 작업 등록</h3>
 
-      <div class="space-y-1 text-sm text-gray-600">
-        <p>
-          선택한 Raw Data:
-          <span class="font-medium text-gray-900"> {{ selectedRawDataIds.length }}건 </span>
-        </p>
-
-        <p>
-          선택한 가공 규칙:
-          <span class="font-medium text-gray-900">
-            {{
-              selectedTransformRule
-                ? `${selectedTransformRule.ruleName} (v${selectedTransformRule.currentVersion})`
-                : '미선택'
-            }}
-          </span>
-        </p>
+        <span class="text-sm text-gray-600"> 선택 {{ selectedRawDataIds.length }}건 </span>
       </div>
 
-      <p class="mt-3 text-xs text-gray-500">
-        실제 가공 등록 기능은 백엔드 API 연동 후 활성화됩니다. 등록된 작업은 PENDING 상태로 저장되고
-        내부 Worker가 순차적으로 처리할 예정입니다.
+      <!-- 등록 대상 목록 -->
+      <div class="overflow-hidden rounded-md border border-gray-200">
+        <div class="max-h-[280px] overflow-auto">
+          <table class="w-full min-w-[500px] text-left text-sm">
+            <thead class="sticky top-0 z-10 bg-gray-50 text-gray-600">
+              <tr>
+                <th class="px-4 py-3 text-left">Raw Data ID</th>
+                <th class="px-4 py-3 text-left">가공 규칙</th>
+                <th class="px-4 py-3 text-left">버전</th>
+                <th class="px-4 py-3 text-center">제거</th>
+              </tr>
+            </thead>
+
+            <tbody class="divide-y divide-gray-100">
+              <tr v-for="rawDataId in selectedRawDataIds" :key="rawDataId" class="hover:bg-gray-50">
+                <td class="px-4 py-3 font-medium text-gray-900">
+                  {{ rawDataId }}
+                </td>
+
+                <td class="px-4 py-3 text-gray-700">
+                  {{ selectedTransformRule?.ruleName || '-' }}
+                </td>
+
+                <td class="px-4 py-3 text-gray-600">
+                  v{{ selectedTransformRule?.currentVersion ?? '-' }}
+                </td>
+
+                <td class="px-4 py-3 text-center">
+                  <button
+                    type="button"
+                    :disabled="isRegistering"
+                    :aria-label="`Raw Data ${rawDataId} 선택 해제`"
+                    class="rounded-md px-2 py-1 text-gray-500 hover:bg-gray-100 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40"
+                    @click="removeSelectedRawData(rawDataId)"
+                  >
+                    ×
+                  </button>
+                </td>
+              </tr>
+
+              <!-- 선택한 데이터가 없는 경우 -->
+              <tr v-if="selectedRawDataIds.length === 0">
+                <td colspan="4" class="px-4 py-8 text-center text-sm text-gray-500">
+                  등록할 Raw Data를 선택해 주세요.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 등록 버튼 -->
+      <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <p class="text-xs text-gray-500">한 번에 최대 100건까지 등록할 수 있습니다.</p>
+
+        <button
+          type="button"
+          :disabled="
+            isRegistering ||
+            isRawDataLoading ||
+            !selectedExternalApiId ||
+            !selectedTransformRuleId ||
+            selectedRawDataIds.length === 0 ||
+            selectedRawDataIds.length > 100
+          "
+          class="rounded-md bg-gray-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
+          @click="registerTransformTasks"
+        >
+          {{ isRegistering ? '등록 중...' : `선택 ${selectedRawDataIds.length}건 가공 등록` }}
+        </button>
+      </div>
+
+      <!-- 등록 안내 -->
+      <p class="mt-3 border-t border-gray-100 pt-3 text-xs text-gray-500">
+        선택한 가공 규칙의 현재 버전으로 이미 등록되었거나 가공에 성공한 데이터는 다시 등록할 수
+        없습니다. 실패한 데이터는 재가공할 수 있습니다.
       </p>
     </div>
   </div>
