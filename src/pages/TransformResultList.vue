@@ -28,7 +28,7 @@ const totalCount = ref(0)
 // 최신 요청의 응답만 반영하기 위한 식별자
 let requestId = 0
 
-// 2. URL 조회조건
+// URL 조회조건
 const queryValue = (value) => (typeof value === 'string' ? value : '')
 
 const currentPage = computed(() => {
@@ -46,7 +46,7 @@ const getQueryParams = () => ({
   size: pageSize.value,
 })
 
-// 3. 페이징 계산
+// 페이징 계산
 const totalPages = computed(() => {
   if (totalCount.value === 0) {
     return 1
@@ -75,7 +75,7 @@ const visiblePages = computed(() => {
   return pages
 })
 
-// 4. URL의 검색조건을 화면에 복원한다.
+// URL의 검색조건을 화면에 복원한다.
 const applyRouteQuery = () => {
   searchCondition.value = {
     externalApiId: queryValue(route.query.externalApiId),
@@ -85,7 +85,7 @@ const applyRouteQuery = () => {
   }
 }
 
-// 5. 검색조건 목록 조회
+// 검색조건 목록 조회
 const fetchSearchOptions = async () => {
   try {
     const [apiResponse, ruleResponse] = await Promise.all([
@@ -102,7 +102,7 @@ const fetchSearchOptions = async () => {
   }
 }
 
-// 6. 가공 결과 목록 조회
+// 가공 결과 목록 조회
 const fetchTransformResultList = async () => {
   const currentRequestId = ++requestId
 
@@ -143,7 +143,7 @@ const fetchTransformResultList = async () => {
   }
 }
 
-// 7. URL Query 갱신
+// URL Query 갱신
 const updateRouteQuery = async (query) => {
   const target = router.resolve({
     path: '/transform-result',
@@ -161,7 +161,7 @@ const updateRouteQuery = async (query) => {
   })
 }
 
-// 8. 검색
+// 검색
 const searchTransformResult = async () => {
   if (
     searchCondition.value.startDate &&
@@ -181,7 +181,7 @@ const searchTransformResult = async () => {
   })
 }
 
-// 9. 검색 초기화
+// 검색 초기화
 const resetSearchCondition = async () => {
   searchCondition.value = {
     externalApiId: '',
@@ -193,7 +193,7 @@ const resetSearchCondition = async () => {
   await updateRouteQuery({ page: '1' })
 }
 
-// 10. 페이지 변경
+// 페이지 변경
 const changePage = async (page) => {
   if (page < 1 || page > totalPages.value || page === currentPage.value) {
     return
@@ -208,7 +208,15 @@ const changePage = async (page) => {
   })
 }
 
-// 11. 날짜 표시
+// 가공 결과 상세 이동
+const goTransformResultDetail = (transformResultId) => {
+  router.push({
+    path: `/transform-result/${transformResultId}`,
+    query: route.query,
+  })
+}
+
+// 날짜 표시
 const formatDateTime = (dateTime) => {
   if (!dateTime) {
     return '-'
@@ -217,7 +225,7 @@ const formatDateTime = (dateTime) => {
   return String(dateTime).replace('T', ' ').substring(0, 19)
 }
 
-// 12. 검색조건과 페이지 변경 시 목록 조회
+// 검색조건과 페이지 변경 시 목록 조회
 watch(
   [
     () => route.query.externalApiId,
@@ -233,12 +241,12 @@ watch(
   { immediate: true },
 )
 
-// 13. 초기 검색조건 조회
+// 초기 검색조건 조회
 onMounted(() => {
   fetchSearchOptions()
 })
 
-// 14. 화면 종료 후 이전 요청 결과 반영 방지
+// 화면 종료 후 이전 요청 결과 반영 방지
 onUnmounted(() => {
   requestId++
 })
@@ -368,6 +376,7 @@ onUnmounted(() => {
             <th class="px-4 py-3 text-center text-xs font-semibold text-gray-500">버전</th>
             <th class="px-4 py-3 text-center text-xs font-semibold text-gray-500">Raw Data ID</th>
             <th class="px-4 py-3 text-center text-xs font-semibold text-gray-500">가공일시</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-gray-500">상세</th>
           </tr>
         </thead>
 
@@ -399,6 +408,16 @@ onUnmounted(() => {
 
             <td class="whitespace-nowrap px-4 py-3 text-center text-gray-600">
               {{ formatDateTime(item.createdAt) }}
+            </td>
+
+            <td class="px-4 py-3 text-center">
+              <button
+                type="button"
+                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                @click="goTransformResultDetail(item.transformResultId)"
+              >
+                상세
+              </button>
             </td>
           </tr>
         </tbody>

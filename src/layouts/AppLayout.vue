@@ -70,7 +70,7 @@ const isActive = (menu) => {
       return route.path === '/transform-task'
 
     case 'transformResult':
-      return route.path === '/transform-result'
+      return route.path === '/transform-result' || route.path.startsWith('/transform-result/')
 
     case 'schedulerInfo':
       return route.path === '/schedulerInfo'
