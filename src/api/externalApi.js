@@ -1,7 +1,10 @@
 import http from './http'
 
-export const getExternalApiList = () => {
-  return http.get('/external-api/list')
+// 검색조건을 기준으로 External API 목록 조회
+export const getExternalApiList = (searchParams = {}) => {
+  return http.get('/external-api/list', {
+    params: searchParams,
+  })
 }
 
 export const getExternalApi = (externalApiId) => {
