@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   getExternalApi,
@@ -265,8 +265,23 @@ const changeAuthType = () => {
   clearAuthErrors()
 }
 
-const addParam = () => {
+const addParam = async () => {
+  // 1. 파라미터 목록에 새로운 입력 항목을 추가한다.
   params.value.push(createEmptyParam())
+
+  // 2. 새로운 입력 항목이 화면에 렌더링될 때까지 대기한다.
+  await nextTick()
+
+  // 3. 추가된 파라미터의 이름 입력란으로 스크롤한다.
+  const input = paramNameInputs.value[params.value.length - 1]
+
+  input?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'center',
+  })
+
+  // 4. 이름 입력란에 포커스를 설정한다.
+  input?.focus({ preventScroll: true })
 }
 
 const removeParam = (index) => {
@@ -1257,14 +1272,6 @@ onMounted(() => {
               API 호출 시 전달할 Header, Query, Body 파라미터를 설정합니다.
             </p>
           </div>
-
-          <button
-            type="button"
-            class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            @click="addParam"
-          >
-            파라미터 추가
-          </button>
         </div>
 
         <div
@@ -1419,7 +1426,16 @@ onMounted(() => {
           </div>
         </div>
 
-        <div class="mt-5 flex justify-end">
+        <!-- 파라미터 추가 및 저장 -->
+        <div class="mt-5 flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            @click="addParam"
+          >
+            파라미터 추가
+          </button>
+
           <button
             type="button"
             class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
