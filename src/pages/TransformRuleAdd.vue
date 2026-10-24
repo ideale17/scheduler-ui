@@ -150,6 +150,12 @@ const validateForm = () => {
 
     targetNames.add(targetName)
 
+    // 날짜 타입은 원본 날짜 형식을 반드시 선택한다.
+    if (field.dataType === 'DATETIME' && !field.valueFormat.trim()) {
+      errorMessage.value = `날짜 입력 형식을 선택해주세요: ${targetName}`
+      return false
+    }
+
     if (field.valueFormat.trim().length > 100) {
       errorMessage.value = '날짜 입력 형식은 100자 이하여야 합니다.'
       return false
@@ -491,15 +497,73 @@ watch(
               </select>
             </div>
 
+            <!-- 날짜 입력 형식 -->
             <div v-if="field.dataType === 'DATETIME'" class="md:col-span-2">
-              <label class="mb-1 block text-sm font-medium text-gray-700"> 날짜 입력 형식 </label>
+              <label class="mb-1 block text-sm font-medium text-gray-700"> 원본 날짜 형식 </label>
+
               <select v-model="field.valueFormat" :class="inputClass">
-                <option value="">형식 선택</option>
-                <option value="ISO_DATETIME">ISO_DATETIME</option>
-                <option value="EPOCH_MILLIS">EPOCH_MILLIS</option>
+                <option value="">날짜 형식을 선택하세요</option>
+                <option value="ISO_DATETIME">ISO 8601 날짜·시간 (시간대 포함)</option>
+                <option value="EPOCH_MILLIS">Unix 타임스탬프 (밀리초)</option>
               </select>
+
               <p class="mt-1 text-xs text-gray-500">
-                실제 날짜 변환은 가공 엔진 구현 시 지원합니다.
+                외부 API에서 전달하는 원본 날짜 값의 형식을 선택합니다.
+              </p>
+
+              <!-- ISO 8601 날짜 변환 예시 -->
+              <div
+                v-if="field.valueFormat === 'ISO_DATETIME'"
+                class="mt-3 rounded-md border border-gray-200 bg-white p-3"
+              >
+                <p class="mb-2 text-xs font-medium text-gray-700">날짜 변환 예시</p>
+
+                <div class="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+                  <div>
+                    <p class="mb-1 text-gray-500">원본 데이터 (한국 시간)</p>
+                    <p class="break-all font-mono text-gray-900">2026-10-24T12:30:00+09:00</p>
+                  </div>
+
+                  <div>
+                    <p class="mb-1 text-gray-500">가공 결과 (UTC)</p>
+                    <p class="break-all font-mono text-gray-900">2026-10-24T03:30:00Z</p>
+                  </div>
+                </div>
+
+                <p class="mt-3 text-xs text-gray-500">
+                  날짜와 시간 사이의 T는 구분 문자이며, +09:00은 한국 시간대를 의미합니다. UTC
+                  기준으로 변환하여 저장합니다.
+                </p>
+              </div>
+
+              <!-- Unix 타임스탬프 변환 예시 -->
+              <div
+                v-else-if="field.valueFormat === 'EPOCH_MILLIS'"
+                class="mt-3 rounded-md border border-gray-200 bg-white p-3"
+              >
+                <p class="mb-2 text-xs font-medium text-gray-700">날짜 변환 예시</p>
+
+                <div class="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+                  <div>
+                    <p class="mb-1 text-gray-500">원본 데이터 (밀리초)</p>
+                    <p class="break-all font-mono text-gray-900">1792812600000</p>
+                  </div>
+
+                  <div>
+                    <p class="mb-1 text-gray-500">가공 결과 (UTC)</p>
+                    <p class="break-all font-mono text-gray-900">2026-10-24T03:30:00Z</p>
+                  </div>
+                </div>
+
+                <p class="mt-3 text-xs text-gray-500">
+                  1970년 1월 1일 00:00:00(UTC)부터 경과한 시간을 밀리초 단위로 표현한 숫자입니다.
+                  UTC 날짜·시간으로 변환하여 저장합니다.
+                </p>
+              </div>
+
+              <p class="mt-2 text-xs text-gray-500">
+                가공 결과는 UTC 기준 ISO 8601 문자열로 저장됩니다. 시간대 정보가 없는 ISO
+                날짜·시간은 변환할 수 없습니다.
               </p>
             </div>
           </div>
