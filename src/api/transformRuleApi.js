@@ -1,7 +1,10 @@
 import http from './http'
 
-export const getTransformRuleList = () => {
-  return http.get('/transform-rule/list')
+// 검색조건을 기준으로 가공 규칙 목록 조회
+export const getTransformRuleList = (searchParams = {}) => {
+  return http.get('/transform-rule/list', {
+    params: searchParams,
+  })
 }
 
 export const getTransformRuleDetail = (transformRuleId) => {
