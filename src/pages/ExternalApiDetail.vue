@@ -8,6 +8,7 @@ import {
   getExternalApiPaging,
   getExternalApiParams,
 } from '@/api/externalApi'
+import { getTransformAutoConfigList } from '@/api/transformAutoConfigApi'
 
 const route = useRoute()
 const router = useRouter()
@@ -15,6 +16,7 @@ const router = useRouter()
 const externalApi = ref(null)
 const paging = ref(null)
 const params = ref([])
+const autoConfigs = ref([])
 const loading = ref(true)
 const isExecuting = ref(false)
 
@@ -23,17 +25,20 @@ const fetchExternalApiDetail = async () => {
     // 1. URL에서 External API 식별자를 조회한다.
     const externalApiId = route.params.externalApiId
 
-    // 2. External API 기본정보와 파라미터를 조회한다.
-    const [externalApiResponse, pagingResponse, paramsResponse] = await Promise.all([
-      getExternalApi(externalApiId),
-      getExternalApiPaging(externalApiId),
-      getExternalApiParams(externalApiId),
-    ])
+    // 2. External API 기본정보, 파라미터 및 자동 가공 설정을 조회한다.
+    const [externalApiResponse, pagingResponse, paramsResponse, autoConfigResponse] =
+      await Promise.all([
+        getExternalApi(externalApiId),
+        getExternalApiPaging(externalApiId),
+        getExternalApiParams(externalApiId),
+        getTransformAutoConfigList(externalApiId),
+      ])
 
     // 3. 조회 결과를 화면 상태에 저장한다.
     externalApi.value = externalApiResponse.data
     paging.value = pagingResponse.data || null
     params.value = Array.isArray(paramsResponse.data) ? paramsResponse.data : []
+    autoConfigs.value = Array.isArray(autoConfigResponse.data) ? autoConfigResponse.data : []
   } catch (error) {
     console.error('External API 상세 조회 실패:', error)
     alert('External API 상세 조회에 실패했습니다.')
@@ -495,6 +500,86 @@ onMounted(() => {
           class="rounded-md border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500"
         >
           등록된 파라미터가 없습니다.
+        </div>
+      </section>
+
+      <!-- 자동 가공 설정 -->
+      <section class="rounded-lg border border-gray-200 bg-white p-5">
+        <div class="mb-5 flex items-center justify-between gap-4">
+          <div>
+            <h3 class="text-base font-semibold text-gray-900">자동 가공 설정</h3>
+            <p class="mt-1 text-sm text-gray-500">
+              Raw Data 수집 시 자동으로 적용되는 가공 규칙 설정입니다.
+            </p>
+          </div>
+
+          <span
+            class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium"
+            :class="
+              autoConfigs.length > 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+            "
+          >
+            {{ autoConfigs.length > 0 ? '설정됨' : '미설정' }}
+          </span>
+        </div>
+
+        <!-- 연결된 자동 가공 규칙 -->
+        <div
+          v-if="autoConfigs.length > 0"
+          class="overflow-x-auto rounded-lg border border-gray-200"
+        >
+          <table class="w-full text-sm">
+            <thead class="border-b border-gray-200 bg-gray-50">
+              <tr>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-gray-500">가공 규칙</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-gray-500">현재 버전</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-gray-500">
+                  규칙 사용 여부
+                </th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-gray-500">자동 가공</th>
+              </tr>
+            </thead>
+
+            <tbody class="divide-y divide-gray-100">
+              <tr
+                v-for="config in autoConfigs"
+                :key="config.autoConfigId"
+                class="transition-colors hover:bg-gray-50"
+              >
+                <td class="px-4 py-3 text-center font-medium text-gray-900">
+                  {{ config.ruleName }}
+                </td>
+
+                <td class="px-4 py-3 text-center text-gray-700">v{{ config.currentVersion }}</td>
+
+                <td class="px-4 py-3 text-center">
+                  <span
+                    class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium"
+                    :class="getEnabledClass(config.ruleEnabled)"
+                  >
+                    {{ getEnabledLabel(config.ruleEnabled) }}
+                  </span>
+                </td>
+
+                <td class="px-4 py-3 text-center">
+                  <span
+                    class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium"
+                    :class="getEnabledClass(config.enabled)"
+                  >
+                    {{ getEnabledLabel(config.enabled) }}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 연결된 규칙 없음 -->
+        <div
+          v-else
+          class="rounded-md border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500"
+        >
+          등록된 자동 가공 규칙이 없습니다.
         </div>
       </section>
     </template>
