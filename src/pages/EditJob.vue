@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getJob, updateJob } from '@/api/jobApi'
 import { getExternalApiList } from '@/api/externalApi'
@@ -10,6 +10,7 @@ const router = useRouter()
 const isLoading = ref(false)
 const isSubmitting = ref(false)
 const paramList = ref([])
+const paramKeyInputs = ref([])
 const externalApiList = ref([])
 const selectedExternalApiId = ref('')
 
@@ -133,11 +134,26 @@ const handleUpdateJob = async () => {
   }
 }
 
-const addParam = () => {
+const addParam = async () => {
+  // 1. 새로운 실행 파라미터를 추가한다.
   paramList.value.push({
     key: '',
     value: '',
   })
+
+  // 2. 추가된 입력란이 렌더링될 때까지 대기한다.
+  await nextTick()
+
+  // 3. 새로운 Key 입력란으로 스크롤한다.
+  const input = paramKeyInputs.value[paramList.value.length - 1]
+
+  input?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'center',
+  })
+
+  // 4. 입력란에 포커스를 설정한다.
+  input?.focus({ preventScroll: true })
 }
 
 const removeParam = (index) => {
@@ -383,20 +399,12 @@ onMounted(() => {
       <!-- 일반 Job 파라미터 -->
       <section v-else class="rounded-lg border border-gray-200 bg-white p-5">
         <div class="mb-5 flex flex-wrap items-start justify-between gap-3">
-          <div>
+          <div class="mb-5">
             <h3 class="text-base font-semibold text-gray-900">실행 파라미터</h3>
             <p class="mt-1 text-sm text-gray-500">
               Job 실행 시 전달할 Key / Value 파라미터를 수정합니다.
             </p>
           </div>
-
-          <button
-            type="button"
-            class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            @click="addParam"
-          >
-            파라미터 추가
-          </button>
         </div>
 
         <div
@@ -417,6 +425,7 @@ onMounted(() => {
                 <label class="mb-1 block text-sm font-medium text-gray-700"> Key </label>
 
                 <input
+                  :ref="(el) => (paramKeyInputs[index] = el)"
                   v-model="param.key"
                   type="text"
                   class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-gray-500"
@@ -442,6 +451,17 @@ onMounted(() => {
               </button>
             </div>
           </div>
+        </div>
+
+        <!-- 파라미터 추가 -->
+        <div class="mt-4 flex justify-end">
+          <button
+            type="button"
+            class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            @click="addParam"
+          >
+            파라미터 추가
+          </button>
         </div>
       </section>
 
