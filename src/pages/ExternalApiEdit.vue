@@ -11,6 +11,11 @@ import {
   saveExternalApiPaging,
   deleteExternalApiPaging,
 } from '@/api/externalApi'
+import { getTransformRuleList } from '@/api/transformRuleApi'
+import {
+  getTransformAutoConfigList,
+  updateTransformAutoConfigs,
+} from '@/api/transformAutoConfigApi'
 import { moveToField, setFieldError } from '@/utils/formValidation'
 
 const route = useRoute()
@@ -132,16 +137,30 @@ const params = ref([])
 const loading = ref(true)
 const savedAuthType = ref('NONE')
 
+// 자동 가공 규칙 설정
+const transformRuleOptions = ref([])
+const autoConfigs = ref([])
+const isSavingAutoConfigs = ref(false)
+const autoConfigError = ref('')
+
 const fetchExternalApi = async () => {
   try {
     // 1. URL에서 External API 식별자를 조회한다.
     const externalApiId = route.params.externalApiId
 
     // 2. External API 기본정보와 파라미터를 조회한다.
-    const [externalApiResponse, pagingResponse, paramsResponse] = await Promise.all([
+    const [
+      externalApiResponse,
+      pagingResponse,
+      paramsResponse,
+      transformRuleResponse,
+      autoConfigResponse,
+    ] = await Promise.all([
       getExternalApi(externalApiId),
       getExternalApiPaging(externalApiId),
       getExternalApiParams(externalApiId),
+      getTransformRuleList(),
+      getTransformAutoConfigList(externalApiId),
     ])
 
     savedAuthType.value = externalApiResponse.data.authType ?? 'NONE'
@@ -231,6 +250,20 @@ const fetchExternalApi = async () => {
           description: param.description || '',
         }))
       : []
+
+    // 6. 등록된 가공 규칙과 자동 가공 연결 설정을 조회 결과로 설정한다.
+    transformRuleOptions.value = Array.isArray(transformRuleResponse.data)
+      ? transformRuleResponse.data
+      : []
+
+    autoConfigs.value = Array.isArray(autoConfigResponse.data)
+      ? autoConfigResponse.data.map((config) => ({
+          transformRuleId: config.transformRuleId,
+          enabled: config.enabled,
+        }))
+      : []
+
+    autoConfigError.value = ''
   } catch (error) {
     console.error('External API 수정 정보 조회 실패:', error)
     alert('External API 수정 정보를 조회하지 못했습니다.')
@@ -693,6 +726,101 @@ const removePaging = async () => {
   } catch (error) {
     console.error('External API 페이징 설정 삭제 실패:', error)
     alert('External API 페이징 설정 삭제 실패')
+  }
+}
+
+// 자동 가공 규칙 추가
+const addAutoConfig = () => {
+  // 1. 아직 선택하지 않은 가공 규칙을 확인한다.
+  const availableRule = transformRuleOptions.value.find(
+    (rule) =>
+      rule.enabled === 'Y' &&
+      !autoConfigs.value.some((config) => config.transformRuleId === rule.transformRuleId),
+  )
+
+  // 2. 추가 가능한 규칙이 없으면 안내한다.
+  if (!availableRule) {
+    alert('추가할 수 있는 사용 중인 가공 규칙이 없습니다.')
+    return
+  }
+
+  // 3. 선택 가능한 첫 번째 규칙을 추가한다.
+  autoConfigs.value.push({
+    transformRuleId: availableRule.transformRuleId,
+    enabled: 'Y',
+  })
+
+  autoConfigError.value = ''
+}
+
+// 자동 가공 규칙 연결 해제
+const removeAutoConfig = (index) => {
+  // 1. 선택한 연결을 화면 목록에서 제거한다.
+  autoConfigs.value.splice(index, 1)
+}
+
+// 가공 규칙 선택 가능 여부
+const isAutoRuleDisabled = (transformRuleId, currentIndex) => {
+  // 1. 다른 연결 항목에서 이미 선택했는지 확인한다.
+  return autoConfigs.value.some(
+    (config, index) => index !== currentIndex && config.transformRuleId === transformRuleId,
+  )
+}
+
+// 자동 가공 규칙 연결 설정 저장
+const saveAutoConfigs = async () => {
+  // 1. 중복 저장을 방지한다.
+  if (isSavingAutoConfigs.value) {
+    return
+  }
+
+  // 2. 가공 규칙 중복 여부를 검증한다.
+  const transformRuleIds = autoConfigs.value.map((config) => config.transformRuleId)
+
+  if (new Set(transformRuleIds).size !== transformRuleIds.length) {
+    autoConfigError.value = '동일한 가공 규칙을 중복으로 연결할 수 없습니다.'
+    return
+  }
+
+  // 3. 저장 여부를 확인한다.
+  if (!confirm('자동 가공 규칙 연결 설정을 저장하시겠습니까?')) {
+    return
+  }
+
+  isSavingAutoConfigs.value = true
+  autoConfigError.value = ''
+
+  try {
+    // 4. 저장 요청 데이터를 구성한다.
+    const configs = autoConfigs.value.map((config) => ({
+      transformRuleId: config.transformRuleId,
+      enabled: config.enabled,
+    }))
+
+    // 5. 자동 가공 규칙 연결 설정을 저장한다.
+    await updateTransformAutoConfigs(route.params.externalApiId, configs)
+
+    // 6. 저장된 연결 설정을 다시 조회한다.
+    const response = await getTransformAutoConfigList(route.params.externalApiId)
+
+    autoConfigs.value = Array.isArray(response.data)
+      ? response.data.map((config) => ({
+          transformRuleId: config.transformRuleId,
+          enabled: config.enabled,
+        }))
+      : []
+
+    // 7. 저장 성공 결과를 표시한다.
+    alert('자동 가공 규칙 연결 설정 저장 성공')
+  } catch (error) {
+    console.error('자동 가공 규칙 연결 설정 저장 실패:', error)
+
+    autoConfigError.value =
+      typeof error.response?.data === 'string'
+        ? error.response.data
+        : '자동 가공 규칙 연결 설정을 저장하지 못했습니다.'
+  } finally {
+    isSavingAutoConfigs.value = false
   }
 }
 
@@ -1442,6 +1570,118 @@ onMounted(() => {
             @click="saveParams"
           >
             파라미터 저장
+          </button>
+        </div>
+      </section>
+
+      <!-- 자동 가공 설정 -->
+      <section class="rounded-lg border border-gray-200 bg-white p-5">
+        <div class="mb-5">
+          <h3 class="text-base font-semibold text-gray-900">자동 가공 설정</h3>
+          <p class="mt-1 text-sm text-gray-500">
+            수집된 Raw Data에 자동으로 적용할 가공 규칙을 설정합니다.
+          </p>
+        </div>
+
+        <!-- 조회 및 저장 오류 -->
+        <div
+          v-if="autoConfigError"
+          class="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+        >
+          {{ autoConfigError }}
+        </div>
+
+        <!-- 연결된 규칙 없음 -->
+        <div
+          v-if="autoConfigs.length === 0"
+          class="rounded-md border border-dashed border-gray-300 bg-gray-50 px-4 py-8 text-center"
+        >
+          <p class="text-sm text-gray-500">연결된 자동 가공 규칙이 없습니다.</p>
+        </div>
+
+        <!-- 연결된 가공 규칙 -->
+        <div v-else class="space-y-3">
+          <div
+            v-for="(config, index) in autoConfigs"
+            :key="index"
+            class="rounded-lg border border-gray-200 bg-gray-50 p-4"
+          >
+            <div class="grid grid-cols-1 items-end gap-4 md:grid-cols-12">
+              <!-- 가공 규칙 선택 -->
+              <div class="md:col-span-7">
+                <label class="mb-1 block text-sm font-medium text-gray-700"> 가공 규칙 </label>
+
+                <select
+                  v-model.number="config.transformRuleId"
+                  class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-gray-500"
+                >
+                  <option
+                    v-for="rule in transformRuleOptions"
+                    :key="rule.transformRuleId"
+                    :value="rule.transformRuleId"
+                    :disabled="
+                      isAutoRuleDisabled(rule.transformRuleId, index) ||
+                      (rule.enabled !== 'Y' && rule.transformRuleId !== config.transformRuleId)
+                    "
+                  >
+                    {{ rule.ruleName }} (v{{ rule.currentVersion }})
+                    {{ rule.enabled === 'N' ? '- 사용 중지' : '' }}
+                  </option>
+                </select>
+              </div>
+
+              <!-- 자동 가공 사용 여부 -->
+              <div class="md:col-span-3">
+                <label class="mb-1 block text-sm font-medium text-gray-700"> 자동 가공 </label>
+
+                <select
+                  v-model="config.enabled"
+                  class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-gray-500"
+                >
+                  <option value="Y">사용</option>
+                  <option value="N">미사용</option>
+                </select>
+              </div>
+
+              <!-- 연결 해제 -->
+              <div class="flex justify-end md:col-span-2">
+                <button
+                  type="button"
+                  class="rounded-md px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                  @click="removeAutoConfig(index)"
+                >
+                  삭제
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 가공 규칙 추가 및 저장 -->
+        <div class="mt-5 flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            :disabled="
+              isSavingAutoConfigs ||
+              !transformRuleOptions.some(
+                (rule) =>
+                  rule.enabled === 'Y' &&
+                  !autoConfigs.some((config) => config.transformRuleId === rule.transformRuleId),
+              )
+            "
+            class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            @click="addAutoConfig"
+          >
+            가공 규칙 추가
+          </button>
+
+          <button
+            type="button"
+            :disabled="isSavingAutoConfigs"
+            class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            @click="saveAutoConfigs"
+          >
+            {{ isSavingAutoConfigs ? '저장 중...' : '자동 가공 설정 저장' }}
           </button>
         </div>
       </section>
