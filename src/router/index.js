@@ -22,6 +22,7 @@ import TransformRuleAdd from '@/pages/TransformRuleAdd.vue'
 import TransformTaskList from '@/pages/TransformTaskList.vue'
 import TransformResultList from '@/pages/TransformResultList.vue'
 import TransformResultDetail from '@/pages/TransformResultDetail.vue'
+import AiAnalysis from '@/pages/AiAnalysis.vue'
 
 const routes = [
   { path: '/login', component: LoginView, meta: { requiresAuth: false, public: true } },
@@ -148,6 +149,14 @@ const routes = [
         component: TransformResultDetail,
         meta: {
           title: '가공 결과 상세',
+          requiresAuth: true,
+        },
+      },
+      {
+        path: 'ai-analysis',
+        component: AiAnalysis,
+        meta: {
+          title: 'AI 데이터 분석',
           requiresAuth: true,
         },
       },

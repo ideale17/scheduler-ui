@@ -35,6 +35,10 @@ const menuGroups = [
     ],
   },
   {
+    label: 'AI ANALYSIS',
+    menus: [{ to: '/ai-analysis', label: 'AI 데이터 분석', match: 'aiAnalysis' }],
+  },
+  {
     label: 'SYSTEM',
     menus: [{ to: '/schedulerInfo', label: 'Scheduler 정보', match: 'schedulerInfo' }],
   },
@@ -71,6 +75,9 @@ const isActive = (menu) => {
 
     case 'transformResult':
       return route.path === '/transform-result' || route.path.startsWith('/transform-result/')
+
+    case 'aiAnalysis':
+      return route.path === '/ai-analysis'
 
     case 'schedulerInfo':
       return route.path === '/schedulerInfo'
