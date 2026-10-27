@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { getExternalApiList } from '@/api/externalApi'
 import { getTransformRuleList, getTransformRuleVersionList } from '@/api/transformRuleApi'
-import { getAiAnalysisDataset } from '@/api/aiAnalysisApi'
+import { getAiAnalysisDataset, executeAiAnalysis } from '@/api/aiAnalysisApi'
 
 // 1. 화면 상태
 const externalApiList = ref([])
@@ -24,6 +24,22 @@ const isOptionsLoading = ref(false)
 const isVersionLoading = ref(false)
 const isLoading = ref(false)
 const errorMessage = ref('')
+
+// AI 분석 질문 및 실행 결과
+const analysisPrompt = ref('')
+const analysisResult = ref(null)
+const analysisErrorMessage = ref('')
+const isAnalysisLoading = ref(false)
+
+let analysisRequestId = 0
+
+// AI 분석 실행 결과를 초기화한다.
+const clearAnalysisResult = () => {
+  analysisRequestId++
+  analysisResult.value = null
+  analysisErrorMessage.value = ''
+  isAnalysisLoading.value = false
+}
 
 let optionsRequestId = 0
 let versionRequestId = 0
@@ -141,6 +157,7 @@ const clearDataset = () => {
   isLoading.value = false
   dataset.value = null
   showFieldDetail.value = false
+  clearAnalysisResult()
 }
 
 // 조회조건을 검증한다.
@@ -198,6 +215,7 @@ const fetchAnalysisDataset = async () => {
 
   dataset.value = null
   showFieldDetail.value = false
+  clearAnalysisResult()
   errorMessage.value = ''
   isLoading.value = true
 
@@ -225,6 +243,76 @@ const fetchAnalysisDataset = async () => {
   } finally {
     if (currentRequestId === datasetRequestId) {
       isLoading.value = false
+    }
+  }
+}
+
+// 선택한 데이터셋을 기준으로 AI 분석을 실행한다.
+const executeAnalysis = async () => {
+  if (isAnalysisLoading.value || isLoading.value) {
+    return
+  }
+
+  // 1. 데이터셋 조회 여부를 확인한다.
+  if (!dataset.value || !hasRecords.value) {
+    analysisErrorMessage.value = '분석 대상 데이터를 먼저 조회해주세요.'
+    return
+  }
+
+  if (dataset.value.hasMore) {
+    analysisErrorMessage.value = '일부 데이터만 조회되었습니다. 분석 기간을 줄여주세요.'
+    return
+  }
+
+  // 2. 분석 질문을 검증한다.
+  const prompt = analysisPrompt.value.trim()
+
+  if (!prompt) {
+    analysisErrorMessage.value = 'AI 분석 질문을 입력해주세요.'
+    return
+  }
+
+  if (prompt.length > 2000) {
+    analysisErrorMessage.value = 'AI 분석 질문은 최대 2000자까지 입력할 수 있습니다.'
+    return
+  }
+
+  // 3. 분석 요청 데이터를 구성한다.
+  const request = {
+    ...searchCondition.value,
+    prompt,
+  }
+
+  const currentRequestId = ++analysisRequestId
+
+  analysisResult.value = null
+  analysisErrorMessage.value = ''
+  isAnalysisLoading.value = true
+
+  try {
+    // 4. AI 분석 실행 API를 호출한다.
+    const response = await executeAiAnalysis(request)
+
+    if (currentRequestId !== analysisRequestId) {
+      return
+    }
+
+    // 5. AI 분석 결과를 화면에 반영한다.
+    analysisResult.value = response.data
+  } catch (error) {
+    if (currentRequestId !== analysisRequestId) {
+      return
+    }
+
+    console.error('AI 분석 실행 실패:', error)
+
+    analysisErrorMessage.value =
+      typeof error.response?.data === 'string'
+        ? error.response.data
+        : 'AI 분석 실행 중 오류가 발생했습니다.'
+  } finally {
+    if (currentRequestId === analysisRequestId) {
+      isAnalysisLoading.value = false
     }
   }
 }
@@ -280,6 +368,7 @@ onUnmounted(() => {
   optionsRequestId++
   versionRequestId++
   datasetRequestId++
+  analysisRequestId++
 })
 </script>
 
@@ -537,6 +626,107 @@ onUnmounted(() => {
       <p class="mt-1 text-sm text-gray-500">
         External API, 가공 규칙, 기간을 선택한 후 분석 대상 조회를 실행합니다.
       </p>
+    </section>
+
+    <!-- AI 분석 -->
+    <section v-if="dataset && hasRecords" class="rounded-lg border border-gray-200 bg-white p-5">
+      <div class="mb-5">
+        <h3 class="text-base font-semibold text-gray-900">AI 분석</h3>
+        <p class="mt-1 text-sm text-gray-500">
+          선택한 데이터셋에 대해 질문하고 AI 분석 결과를 확인합니다.
+        </p>
+      </div>
+
+      <!-- 분석 질문 -->
+      <form @submit.prevent="executeAnalysis">
+        <div>
+          <label for="analysis-prompt" class="mb-2 block text-sm font-medium text-gray-700">
+            분석 질문
+          </label>
+
+          <textarea
+            id="analysis-prompt"
+            v-model="analysisPrompt"
+            :disabled="isAnalysisLoading || dataset.hasMore"
+            maxlength="2000"
+            rows="4"
+            placeholder="예: 최근 데이터의 주요 변화와 이상 징후를 분석해줘."
+            class="w-full resize-y rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-500 disabled:bg-gray-50 disabled:opacity-70"
+          ></textarea>
+
+          <div class="mt-1 flex justify-between text-xs text-gray-500">
+            <span>분석 질문은 최대 2,000자까지 입력할 수 있습니다.</span>
+            <span>{{ analysisPrompt.length }} / 2000</span>
+          </div>
+        </div>
+
+        <!-- 분석 실행 제한 안내 -->
+        <div
+          v-if="dataset.hasMore"
+          class="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+        >
+          전체 가공 결과 중 일부만 조회되었습니다. 전체 범위에 대한 잘못된 분석을 방지하기 위해
+          실행할 수 없습니다. 분석 기간을 줄여 다시 조회해주세요.
+        </div>
+
+        <!-- AI 오류 메시지 -->
+        <div
+          v-if="analysisErrorMessage"
+          role="alert"
+          class="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+        >
+          {{ analysisErrorMessage }}
+        </div>
+
+        <!-- 실행 버튼 -->
+        <div class="mt-4 flex justify-end">
+          <button
+            type="submit"
+            :disabled="isAnalysisLoading || isLoading || dataset.hasMore || !analysisPrompt.trim()"
+            class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {{ isAnalysisLoading ? 'AI 분석 중...' : 'AI 분석 실행' }}
+          </button>
+        </div>
+      </form>
+
+      <!-- 분석 중 -->
+      <div
+        v-if="isAnalysisLoading"
+        role="status"
+        class="mt-5 rounded-md border border-gray-200 bg-gray-50 px-4 py-5 text-center text-sm text-gray-500"
+      >
+        AI가 데이터셋을 분석하고 있습니다.
+      </div>
+
+      <!-- AI 분석 결과 -->
+      <div v-if="analysisResult && !isAnalysisLoading" class="mt-5 border-t border-gray-200 pt-5">
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <h4 class="text-sm font-semibold text-gray-900">분석 결과</h4>
+
+          <span class="rounded-md bg-gray-100 px-2 py-1 text-xs text-gray-600">
+            {{ analysisResult.model }}
+          </span>
+        </div>
+
+        <!-- AI 응답 텍스트 -->
+        <div
+          class="whitespace-pre-wrap break-words rounded-md bg-gray-50 p-4 text-sm leading-7 text-gray-800"
+        >
+          {{ analysisResult.answer }}
+        </div>
+
+        <!-- 분석에 사용한 데이터 규모 -->
+        <div class="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs text-gray-500">
+          <span> 전체 가공 결과: {{ analysisResult.totalSourceCount }}건 </span>
+          <span> 처리한 가공 결과: {{ analysisResult.sourceCount }}건 </span>
+          <span> 처리한 JSON 레코드: {{ analysisResult.recordCount }}건 </span>
+        </div>
+
+        <p class="mt-3 text-xs text-gray-500">
+          AI가 생성한 분석 내용은 정확성을 보장하지 않으므로 주요 수치와 판단 근거를 확인해주세요.
+        </p>
+      </div>
     </section>
   </div>
 </template>

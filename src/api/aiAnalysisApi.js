@@ -13,3 +13,8 @@ export const getAiAnalysisDataset = (searchParams) => {
     params: searchParams,
   })
 }
+
+// 선택한 데이터셋에 대해 AI 분석을 실행한다.
+export const executeAiAnalysis = (request) => {
+  return http.post('/ai-analysis/execute', request)
+}
