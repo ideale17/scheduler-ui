@@ -245,6 +245,8 @@ const fetchExternalApi = async () => {
           valueType: param.valueType,
           paramValue: param.paramValue || '',
           valueFormat: param.valueFormat || '',
+          offsetUnit: param.offsetUnit || '',
+          offsetValue: param.offsetValue ?? 0,
           requiredYn: param.requiredYn,
           sortOrder: param.sortOrder,
           description: param.description || '',
@@ -273,6 +275,83 @@ const fetchExternalApi = async () => {
   }
 }
 
+const offsetUnitOptions = {
+  CURRENT_DATE: [
+    { value: 'DAY', label: '일' },
+    { value: 'MONTH', label: '월' },
+    { value: 'YEAR', label: '년' },
+  ],
+  CURRENT_TIME: [
+    { value: 'MINUTE', label: '분' },
+    { value: 'HOUR', label: '시간' },
+  ],
+  CURRENT_DATETIME: [
+    { value: 'MINUTE', label: '분' },
+    { value: 'HOUR', label: '시간' },
+    { value: 'DAY', label: '일' },
+    { value: 'MONTH', label: '월' },
+    { value: 'YEAR', label: '년' },
+  ],
+}
+
+// 값 유형에 따라 선택 가능한 이동 단위를 반환한다.
+const getOffsetUnitOptions = (valueType) => {
+  return offsetUnitOptions[valueType] || []
+}
+
+// 값 유형을 변경하면 이전 오프셋 설정을 초기화한다.
+const changeParamValueType = (param) => {
+  param.offsetUnit = ''
+  param.offsetValue = 0
+}
+
+// 이동 단위를 해제하면 이동 값을 초기화한다.
+const changeOffsetUnit = (param) => {
+  if (!param.offsetUnit) {
+    param.offsetValue = 0
+  }
+}
+
+// 날짜·시간 오프셋 입력값을 검증한다.
+const validateParamOffset = (param) => {
+  // 1. 고정값 유형은 오프셋을 사용하지 않는다.
+  if (param.valueType === 'STATIC') {
+    return ''
+  }
+
+  // 2. 이동 단위가 없으면 이동 값은 0이어야 한다.
+  if (!param.offsetUnit) {
+    if (param.offsetValue !== 0 && param.offsetValue !== '0') {
+      return '이동 값을 사용하려면 이동 단위를 선택해주세요.'
+    }
+
+    return ''
+  }
+
+  // 3. 값 유형에 사용할 수 있는 이동 단위인지 확인한다.
+  const validUnits = getOffsetUnitOptions(param.valueType)
+
+  if (!validUnits.some((unit) => unit.value === param.offsetUnit)) {
+    return '선택한 값 유형에서 사용할 수 없는 이동 단위입니다.'
+  }
+
+  // 4. 이동 값이 정수인지 확인한다.
+  if (
+    param.offsetValue === '' ||
+    param.offsetValue === null ||
+    !Number.isInteger(Number(param.offsetValue))
+  ) {
+    return '이동 값은 정수로 입력해주세요.'
+  }
+
+  // 5. 이동 값의 허용 범위를 확인한다.
+  if (Number(param.offsetValue) < -10000 || Number(param.offsetValue) > 10000) {
+    return '이동 값은 -10000부터 10000까지 입력할 수 있습니다.'
+  }
+
+  return ''
+}
+
 const createEmptyParam = () => {
   return {
     paramLocation: 'QUERY',
@@ -280,6 +359,8 @@ const createEmptyParam = () => {
     valueType: 'STATIC',
     paramValue: '',
     valueFormat: '',
+    offsetUnit: '',
+    offsetValue: 0,
     requiredYn: 'N',
     sortOrder: params.value.length + 1,
     description: '',
@@ -530,6 +611,7 @@ const validateParams = () => {
       paramName: '',
       paramValue: '',
       valueFormat: '',
+      offsetValue: '',
     }
 
     if (!param.paramName.trim()) {
@@ -547,6 +629,14 @@ const validateParams = () => {
     if (param.valueType !== 'STATIC' && !param.valueFormat.trim()) {
       errors.value.params[i].valueFormat = '포맷을 입력해주세요.'
       moveToField(paramFormatInputs.value[i])
+      return false
+    }
+
+    // 3. 날짜·시간 오프셋 설정을 검증한다.
+    const offsetError = validateParamOffset(param)
+
+    if (offsetError) {
+      errors.value.params[i].offsetValue = offsetError
       return false
     }
   }
@@ -685,6 +775,9 @@ const saveParams = async () => {
       ...param,
       paramValue: param.valueType === 'STATIC' ? param.paramValue || null : null,
       valueFormat: param.valueType === 'STATIC' ? null : param.valueFormat || null,
+      offsetUnit: param.valueType === 'STATIC' ? null : param.offsetUnit || null,
+      offsetValue:
+        param.valueType === 'STATIC' || !param.offsetUnit ? 0 : Number(param.offsetValue),
       description: param.description || null,
     }))
 
@@ -1454,6 +1547,7 @@ onMounted(() => {
                 <select
                   v-model="param.valueType"
                   class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-gray-500"
+                  @change="changeParamValueType(param)"
                 >
                   <option value="STATIC">STATIC</option>
                   <option value="CURRENT_DATE">CURRENT_DATE</option>
@@ -1518,6 +1612,49 @@ onMounted(() => {
                 <p v-if="errors.params[index]?.valueFormat" class="mt-1 text-xs text-red-600">
                   {{ errors.params[index].valueFormat }}
                 </p>
+              </div>
+
+              <!-- 날짜·시간 이동 단위 -->
+              <div v-if="param.valueType !== 'STATIC'">
+                <label class="mb-1 block text-sm font-medium text-gray-700"> 이동 단위 </label>
+
+                <select
+                  v-model="param.offsetUnit"
+                  class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-gray-500"
+                  @change="changeOffsetUnit(param)"
+                >
+                  <option value="">이동 없음</option>
+
+                  <option
+                    v-for="unit in getOffsetUnitOptions(param.valueType)"
+                    :key="unit.value"
+                    :value="unit.value"
+                  >
+                    {{ unit.label }}
+                  </option>
+                </select>
+              </div>
+
+              <!-- 날짜·시간 이동 값 -->
+              <div v-if="param.valueType !== 'STATIC'">
+                <label class="mb-1 block text-sm font-medium text-gray-700"> 이동 값 </label>
+
+                <input
+                  v-model.number="param.offsetValue"
+                  type="number"
+                  step="1"
+                  min="-10000"
+                  max="10000"
+                  :disabled="!param.offsetUnit"
+                  class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-gray-500 disabled:bg-gray-100 disabled:text-gray-500"
+                  @input="errors.params[index] && (errors.params[index].offsetValue = '')"
+                />
+
+                <p v-if="errors.params[index]?.offsetValue" class="mt-1 text-xs text-red-600">
+                  {{ errors.params[index].offsetValue }}
+                </p>
+
+                <p class="mt-1 text-xs text-gray-500">음수: 과거 / 양수: 미래 / 0: 현재</p>
               </div>
 
               <div>
