@@ -20,6 +20,19 @@ const autoConfigs = ref([])
 const loading = ref(true)
 const isExecuting = ref(false)
 
+// 날짜·시간 오프셋 단위를 화면에 표시할 이름으로 변환한다.
+const getOffsetUnitLabel = (offsetUnit) => {
+  const unitLabels = {
+    MINUTE: '분',
+    HOUR: '시간',
+    DAY: '일',
+    MONTH: '월',
+    YEAR: '년',
+  }
+
+  return unitLabels[offsetUnit] || '-'
+}
+
 const fetchExternalApiDetail = async () => {
   try {
     // 1. URL에서 External API 식별자를 조회한다.
@@ -429,6 +442,12 @@ onMounted(() => {
                   포맷
                 </th>
                 <th class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500">
+                  이동 단위
+                </th>
+                <th class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500">
+                  이동 값
+                </th>
+                <th class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500">
                   필수
                 </th>
                 <th class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500">
@@ -466,6 +485,16 @@ onMounted(() => {
 
                 <td class="px-4 py-3 text-center text-gray-600">
                   {{ param.valueFormat || '-' }}
+                </td>
+
+                <!-- 날짜·시간 이동 단위 -->
+                <td class="px-4 py-3 text-center text-gray-600">
+                  {{ getOffsetUnitLabel(param.offsetUnit) }}
+                </td>
+
+                <!-- 날짜·시간 이동 값 -->
+                <td class="px-4 py-3 text-center text-gray-600">
+                  {{ param.offsetUnit ? (param.offsetValue ?? 0) : '-' }}
                 </td>
 
                 <td class="px-4 py-3 text-center">
