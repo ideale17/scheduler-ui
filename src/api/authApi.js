@@ -12,7 +12,10 @@ export const logoutUser = () => {
 }
 
 export const getCurrentUser = () => {
-  return http.get('/auth/me')
+  return http.get('/auth/me', {
+    // 인증 확인 요청의 401은 호출한 Router에서 처리한다.
+    skipUnauthorizedRedirect: true,
+  })
 }
 
 export const signupUser = (username, password, passwordConfirm) => {
