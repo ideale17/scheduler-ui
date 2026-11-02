@@ -38,11 +38,15 @@ const routes = [
         meta: { title: '대시보드', requiresAuth: true },
       },
       { path: 'jobList', component: JobList, meta: { title: 'Job 관리', requiresAuth: true } },
-      { path: 'add', component: AddJobForm, meta: { title: 'Job 등록', requiresAuth: true } },
+      {
+        path: 'add',
+        component: AddJobForm,
+        meta: { title: 'Job 등록', requiresAuth: true, requiresAdmin: true },
+      },
       {
         path: 'edit/:jobName/:jobGroup',
         component: EditJob,
-        meta: { title: 'Job 수정', requiresAuth: true },
+        meta: { title: 'Job 수정', requiresAuth: true, requiresAdmin: true },
       },
       {
         path: 'JobHistory',
@@ -79,6 +83,7 @@ const routes = [
         meta: {
           title: 'API 등록',
           requiresAuth: true,
+          requiresAdmin: true,
         },
       },
       {
@@ -87,6 +92,7 @@ const routes = [
         meta: {
           title: 'API 수정',
           requiresAuth: true,
+          requiresAdmin: true,
         },
       },
       {
@@ -127,6 +133,7 @@ const routes = [
         meta: {
           title: '가공 규칙 등록',
           requiresAuth: true,
+          requiresAdmin: true,
         },
       },
       {
@@ -221,6 +228,13 @@ router.beforeEach(async (to, from, next) => {
     await authStore.loadCurrentUser()
 
     if (authStore.isAuthenticated) {
+      // 관리자 전용 화면은 ROLE_ADMIN 권한을 확인한다.
+      const needsAdmin = to.matched.some((r) => r.meta?.requiresAdmin)
+
+      if (needsAdmin && !authStore.isAdmin) {
+        return next('/')
+      }
+
       return next()
     }
   } catch {

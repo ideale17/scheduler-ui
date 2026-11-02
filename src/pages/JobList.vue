@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/authStore'
 import {
   deleteJob as deleteJobApi,
   getJobList,
@@ -10,6 +11,7 @@ import {
 } from '@/api/jobApi'
 
 const router = useRouter()
+const authStore = useAuthStore()
 const jobList = ref([])
 const selectedJobKeys = ref([])
 const isRefreshing = ref(false)
@@ -264,7 +266,7 @@ onMounted(() => {
   <div class="space-y-4">
     <!-- 상단 작업 영역 -->
     <div class="flex flex-wrap items-end justify-between gap-4">
-      <div class="text-sm text-gray-500">등록된 Job을 조회하고 실행, 시작, 중지할 수 있습니다.</div>
+      <div class="text-sm text-gray-500">등록된 Job의 스케줄과 실행 상태를 조회합니다.</div>
 
       <div class="flex items-center gap-2">
         <button
@@ -277,6 +279,7 @@ onMounted(() => {
         </button>
 
         <button
+          v-if="authStore.isAdmin"
           type="button"
           class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
           @click="router.push('/add')"
@@ -288,6 +291,7 @@ onMounted(() => {
 
     <!-- 선택 작업 -->
     <div
+      v-if="authStore.isAdmin"
       class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3"
     >
       <div class="text-sm text-gray-500">
@@ -358,7 +362,7 @@ onMounted(() => {
       <table class="w-full text-sm">
         <thead class="border-b border-gray-200 bg-gray-50">
           <tr>
-            <th class="w-12 px-4 py-3 text-center">
+            <th v-if="authStore.isAdmin" class="w-12 px-4 py-3 text-center">
               <input
                 v-model="allSelected"
                 type="checkbox"
@@ -402,7 +406,7 @@ onMounted(() => {
             :key="job.jobName + job.jobGroup"
             class="transition-colors hover:bg-gray-50"
           >
-            <td class="px-4 py-3 text-center">
+            <td v-if="authStore.isAdmin" class="px-4 py-3 text-center">
               <input
                 v-model="selectedJobKeys"
                 type="checkbox"
@@ -473,6 +477,7 @@ onMounted(() => {
                 </button>
 
                 <button
+                  v-if="authStore.isAdmin"
                   type="button"
                   class="rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
                   @click="editJob(job.jobName, job.jobGroup)"
@@ -481,6 +486,7 @@ onMounted(() => {
                 </button>
 
                 <button
+                  v-if="authStore.isAdmin"
                   type="button"
                   class="rounded-md px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
                   @click="deleteJob(job.jobName, job.jobGroup)"
@@ -506,6 +512,7 @@ onMounted(() => {
       </p>
 
       <button
+        v-if="authStore.isAdmin"
         type="button"
         class="mt-4 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
         @click="router.push('/add')"

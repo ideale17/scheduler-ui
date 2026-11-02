@@ -1,10 +1,13 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useAuthStore } from '@/stores/authStore'
 import { getExternalApiList } from '@/api/externalApi'
 import { getTransformRuleList, getTransformRuleVersionList } from '@/api/transformRuleApi'
 import { getAiAnalysisDataset, executeAiAnalysis } from '@/api/aiAnalysisApi'
 
 // 1. 화면 상태
+const authStore = useAuthStore()
+
 const externalApiList = ref([])
 const transformRuleList = ref([])
 const versionList = ref([])
@@ -249,6 +252,11 @@ const fetchAnalysisDataset = async () => {
 
 // 선택한 데이터셋을 기준으로 AI 분석을 실행한다.
 const executeAnalysis = async () => {
+  // 관리자 권한이 없는 경우 AI 분석을 실행하지 않는다.
+  if (!authStore.isAdmin) {
+    return
+  }
+
   if (isAnalysisLoading.value || isLoading.value) {
     return
   }
@@ -629,7 +637,10 @@ onUnmounted(() => {
     </section>
 
     <!-- AI 분석 -->
-    <section v-if="dataset && hasRecords" class="rounded-lg border border-gray-200 bg-white p-5">
+    <section
+      v-if="dataset && hasRecords && authStore.isAdmin"
+      class="rounded-lg border border-gray-200 bg-white p-5"
+    >
       <div class="mb-5">
         <h3 class="text-base font-semibold text-gray-900">AI 분석</h3>
         <p class="mt-1 text-sm text-gray-500">

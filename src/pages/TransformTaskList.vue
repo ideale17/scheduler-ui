@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/authStore'
 import { getExternalApiList } from '@/api/externalApi'
 import { getRawDataList } from '@/api/rawDataApi'
 import { getTransformRuleList } from '@/api/transformRuleApi'
@@ -8,6 +9,7 @@ import { createManualTransformTasks, getTransformTaskHistory } from '@/api/trans
 
 // 화면 상태
 const router = useRouter()
+const authStore = useAuthStore()
 
 const externalApiList = ref([])
 const transformRuleList = ref([])
@@ -549,10 +551,13 @@ onUnmounted(() => {
         class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-3"
       >
         <div>
-          <h3 class="text-sm font-semibold text-gray-900">② 가공 대상 선택</h3>
+          <h3 class="text-sm font-semibold text-gray-900">
+            {{ authStore.isAdmin ? '② 가공 대상 선택' : '② 가공 대상 조회' }}
+          </h3>
 
           <p class="mt-1 text-xs text-gray-500">
-            전체 {{ totalCount }}건 / 선택 {{ selectedRawDataIds.length }}건
+            전체 {{ totalCount }}건
+            <template v-if="authStore.isAdmin"> / 선택 {{ selectedRawDataIds.length }}건 </template>
           </p>
         </div>
       </div>
@@ -577,7 +582,7 @@ onUnmounted(() => {
         <table class="w-full min-w-[900px] text-left text-sm">
           <thead class="bg-gray-50 text-gray-600">
             <tr>
-              <th class="px-4 py-3">
+              <th v-if="authStore.isAdmin" class="px-4 py-3">
                 <input
                   type="checkbox"
                   :checked="isCurrentPageSelected"
@@ -603,7 +608,7 @@ onUnmounted(() => {
             <template v-for="item in rawDataList" :key="item.rawDataId">
               <!-- Raw Data 행 -->
               <tr class="hover:bg-gray-50">
-                <td class="px-4 py-3">
+                <td v-if="authStore.isAdmin" class="px-4 py-3">
                   <input
                     type="checkbox"
                     :checked="selectedRawDataIds.includes(item.rawDataId)"
@@ -807,7 +812,7 @@ onUnmounted(() => {
     </div>
 
     <!-- ③ 가공 작업 등록 -->
-    <div class="rounded-lg border border-gray-200 bg-white p-4">
+    <div v-if="authStore.isAdmin" class="rounded-lg border border-gray-200 bg-white p-4">
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h3 class="text-sm font-semibold text-gray-900">③ 가공 작업 등록</h3>
 

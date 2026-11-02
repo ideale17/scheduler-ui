@@ -1,9 +1,11 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/authStore'
 import { executeExternalApi, getExternalApiList } from '@/api/externalApi'
 
 const router = useRouter()
+const authStore = useAuthStore()
 
 const externalApiList = ref([])
 const isLoading = ref(false)
@@ -212,6 +214,7 @@ onMounted(() => {
     <!-- API 등록 -->
     <div class="flex justify-end">
       <button
+        v-if="authStore.isAdmin"
         type="button"
         class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
         @click="router.push('/externalApi/add')"
@@ -324,6 +327,7 @@ onMounted(() => {
                 </button>
 
                 <button
+                  v-if="authStore.isAdmin"
                   type="button"
                   class="rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
                   @click="executeApi(externalApi)"
@@ -360,6 +364,7 @@ onMounted(() => {
         </p>
 
         <button
+          v-if="authStore.isAdmin"
           type="button"
           class="mt-4 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
           @click="router.push('/externalApi/add')"

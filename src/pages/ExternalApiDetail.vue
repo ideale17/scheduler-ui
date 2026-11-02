@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/authStore'
 import {
   deleteExternalApi,
   executeExternalApi,
@@ -12,6 +13,7 @@ import { getTransformAutoConfigList } from '@/api/transformAutoConfigApi'
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 
 const externalApi = ref(null)
 const paging = ref(null)
@@ -152,6 +154,7 @@ onMounted(() => {
 
           <div class="flex flex-wrap items-center gap-2">
             <button
+              v-if="authStore.isAdmin"
               type="button"
               :disabled="isExecuting"
               class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
@@ -161,6 +164,7 @@ onMounted(() => {
             </button>
 
             <button
+              v-if="authStore.isAdmin"
               type="button"
               class="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700"
               @click="router.push(`/externalApi/${externalApi.externalApiId}/edit`)"
@@ -169,6 +173,7 @@ onMounted(() => {
             </button>
 
             <button
+              v-if="authStore.isAdmin"
               type="button"
               class="rounded-md px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50"
               @click="deleteApi"

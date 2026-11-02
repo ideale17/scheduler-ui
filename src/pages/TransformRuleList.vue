@@ -1,9 +1,11 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/authStore'
 import { getTransformRuleList } from '@/api/transformRuleApi'
 
 const router = useRouter()
+const authStore = useAuthStore()
 
 const transformRuleList = ref([])
 const isLoading = ref(false)
@@ -170,7 +172,7 @@ onMounted(() => {
     </section>
 
     <!-- 가공 규칙 등록 -->
-    <div class="flex justify-end">
+    <div v-if="authStore.isAdmin" class="flex justify-end">
       <button
         type="button"
         class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
