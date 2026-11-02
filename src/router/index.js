@@ -197,11 +197,15 @@ router.beforeEach(async (to, from, next) => {
 
   // 2. 인증이 필요 없는 화면의 접근을 처리한다.
   if (!needsAuth) {
-    // 이미 로그인한 사용자는 로그인·회원가입 화면 대신 홈으로 이동한다.
+    // 로그인,회원가입 화면에 접근할 때 로그인 상태를 확인한다.
     if (to.path === '/login' || to.path === '/signup') {
       try {
-        await authStore.loadCurrentUser()
+        // 서버 인증 확인을 아직 수행하지 않은 경우에만 조회한다.
+        if (!authStore.isInitialized) {
+          await authStore.loadCurrentUser()
+        }
 
+        // 이미 인증된 사용자는 홈으로 이동한다.
         if (authStore.isAuthenticated) {
           return next('/')
         }
