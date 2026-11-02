@@ -1,4 +1,5 @@
 import { createApp } from 'vue'
+import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
 import { setUnauthorizedHandler } from '@/api/http'
@@ -16,4 +17,8 @@ setUnauthorizedHandler(() => {
   }
 })
 
-createApp(App).use(router).mount('#app')
+// Pinia 인스턴스를 생성한다.
+const pinia = createPinia()
+
+// Vue 애플리케이션에 Pinia와 Router를 등록한다.
+createApp(App).use(pinia).use(router).mount('#app')
