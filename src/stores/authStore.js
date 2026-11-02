@@ -53,12 +53,15 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * 로그아웃 API를 호출하고 사용자 정보를 초기화한다.
-   * 서버에서 로그아웃이 성공한 경우에만 클라이언트 상태를 초기화한다.
+   * 서버 세션을 종료하고 로그아웃 상태를 저장한다.
    */
   const logout = async () => {
+    // 1. 서버 세션을 종료한다.
     await logoutUser()
-    clearUser()
+
+    // 2. 로그아웃 결과를 Pinia에 반영한다.
+    user.value = null
+    isInitialized.value = true
   }
 
   /**
