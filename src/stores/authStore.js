@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { getCurrentUser } from '@/api/authApi'
+import { getCurrentUser, loginUser, logoutUser } from '@/api/authApi'
 
 export const useAuthStore = defineStore('auth', () => {
   // 1. 서버에서 확인한 로그인 사용자 정보를 관리한다.
@@ -39,6 +39,31 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
+   * 로그인 API를 호출하고 사용자 정보를 조회한다.
+   * 로그인 성공 후 서버에서 확인한 사용자 정보를 Store에 저장한다.
+   */
+  const login = async (username, password) => {
+    await loginUser(username, password)
+
+    const currentUser = await loadCurrentUser()
+
+    if (!currentUser) {
+      throw new Error('로그인 사용자 정보를 확인할 수 없습니다.')
+    }
+
+    return currentUser
+  }
+
+  /**
+   * 로그아웃 API를 호출하고 사용자 정보를 초기화한다.
+   * 서버에서 로그아웃이 성공한 경우에만 클라이언트 상태를 초기화한다.
+   */
+  const logout = async () => {
+    await logoutUser()
+    clearUser()
+  }
+
+  /**
    * 클라이언트에 저장된 로그인 사용자 정보를 초기화한다.
    * 서버 세션을 종료하는 로그아웃 API는 호출하지 않는다.
    */
@@ -52,6 +77,8 @@ export const useAuthStore = defineStore('auth', () => {
     isInitialized,
     isAuthenticated,
     loadCurrentUser,
+    login,
+    logout,
     clearUser,
   }
 })

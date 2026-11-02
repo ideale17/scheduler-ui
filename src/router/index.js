@@ -1,4 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { getSignupEnabled } from '@/api/authApi'
+import { useAuthStore } from '@/stores/authStore'
 import AppLayout from '@/layouts/AppLayout.vue'
 import LoginView from '@/pages/LoginView.vue'
 import SignupView from '@/pages/SignupView.vue'
@@ -8,7 +10,6 @@ import AddJobForm from '@/pages/AddJobForm.vue'
 import EditJob from '@/pages/EditJob.vue'
 import JobHistory from '@/pages/JobHistory.vue'
 import SchedulerInfoView from '@/pages/SchedulerInfoView.vue'
-import { getCurrentUser, getSignupEnabled } from '@/api/authApi'
 import ExternalApiList from '@/pages/ExternalApiList.vue'
 import ExternalApiAdd from '@/pages/ExternalApiAdd.vue'
 import ExternalApiDetail from '@/pages/ExternalApiDetail.vue'
@@ -176,8 +177,9 @@ const router = createRouter({
   routes: routes,
 })
 
-// 중첩 라우트 대응 가드
+// 중첩 라우트를 포함해 페이지 접근 전에 인증 상태를 확인한다.
 router.beforeEach(async (to, from, next) => {
+  const authStore = useAuthStore()
   const needsAuth = to.matched.some((r) => r.meta?.requiresAuth)
 
   // 1. 회원가입 화면 접근 가능 여부를 확인한다.
@@ -193,32 +195,39 @@ router.beforeEach(async (to, from, next) => {
     }
   }
 
+  // 2. 인증이 필요 없는 화면의 접근을 처리한다.
   if (!needsAuth) {
-    // 로그인 페이지에 이미 로그인 상태로 들어오면 홈으로
+    // 이미 로그인한 사용자는 로그인·회원가입 화면 대신 홈으로 이동한다.
     if (to.path === '/login' || to.path === '/signup') {
       try {
-        const { data } = await getCurrentUser()
+        await authStore.loadCurrentUser()
 
-        if (data?.username) {
+        if (authStore.isAuthenticated) {
           return next('/')
         }
       } catch {
-        /* unauthenticated or /auth/me failed: fall through */
+        // 인증 확인이 실패한 경우 기존 공개 화면 접근을 유지한다.
       }
     }
     return next()
   }
 
+  // 3. 인증이 필요한 화면에 접근하기 전에 서버 세션을 확인한다.
   try {
-    const { data } = await getCurrentUser()
-    if (data?.username) {
+    await authStore.loadCurrentUser()
+
+    if (authStore.isAuthenticated) {
       return next()
     }
   } catch {
-    /* unauthenticated or /auth/me failed: fall through */
+    // 인증 확인 실패 시 로그인 화면으로 이동한다.
   }
 
-  return next({ path: '/login', query: { redirect: to.fullPath } })
+  // 4. 인증되지 않은 사용자는 로그인 후 원래 화면으로 복귀하도록 한다.
+  return next({
+    path: '/login',
+    query: { redirect: to.fullPath },
+  })
 })
 
 export default router

@@ -1,10 +1,11 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
-import { getCurrentUser, logoutUser } from '@/api/authApi'
+import { useAuthStore } from '@/stores/authStore'
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 
 const menuGroups = [
   {
@@ -89,23 +90,19 @@ const isActive = (menu) => {
 
 const pageTitle = computed(() => route.meta.title || '')
 
-const username = ref(null)
-
-onMounted(async () => {
-  try {
-    const { data } = await getCurrentUser()
-
-    username.value = data?.username ?? null
-  } catch {
-    username.value = null
-  }
-})
+// Pinia에 저장된 로그인 사용자 이름을 사용한다.
+const username = computed(() => authStore.user?.username ?? null)
 
 const logout = async () => {
   try {
-    await logoutUser()
-  } finally {
-    router.push('/login')
+    // 서버 세션을 종료하고 Pinia의 사용자 정보를 초기화한다.
+    await authStore.logout()
+
+    // 로그아웃 성공 후 로그인 화면으로 이동한다.
+    await router.replace('/login')
+  } catch (error) {
+    console.error('로그아웃 실패:', error)
+    alert('로그아웃 처리에 실패했습니다. 다시 시도해주세요.')
   }
 }
 </script>

@@ -1,10 +1,12 @@
 <script setup>
 import { onMounted, ref } from 'vue'
-import { getSignupEnabled, loginUser } from '@/api/authApi'
+import { getSignupEnabled } from '@/api/authApi'
+import { useAuthStore } from '@/stores/authStore'
 import { useRouter, useRoute } from 'vue-router'
 
 const router = useRouter()
 const route = useRoute()
+const authStore = useAuthStore()
 const username = ref('')
 const password = ref('')
 const err = ref('')
@@ -12,13 +14,14 @@ const signupEnabled = ref(false)
 
 const login = async () => {
   err.value = ''
-  try {
-    // 세션 발급
-    await loginUser(username.value, password.value)
 
-    // 돌아갈 곳 있으면 그리, 없으면 홈
+  try {
+    // 서버 로그인 후 현재 사용자 정보를 Pinia에 저장한다.
+    await authStore.login(username.value, password.value)
+
+    // 로그인 전 접근하려던 화면이 있으면 해당 화면으로 이동한다.
     const redirect = route.query.redirect?.toString() || '/'
-    router.replace(redirect)
+    await router.replace(redirect)
   } catch {
     err.value = '로그인 실패'
   }
