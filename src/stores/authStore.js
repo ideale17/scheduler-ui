@@ -43,15 +43,13 @@ export const useAuthStore = defineStore('auth', () => {
    * 로그인 성공 후 서버에서 확인한 사용자 정보를 Store에 저장한다.
    */
   const login = async (username, password) => {
+    // 1. 서버에 로그인 요청을 전송한다.
     await loginUser(username, password)
 
-    const currentUser = await loadCurrentUser()
-
-    if (!currentUser) {
-      throw new Error('로그인 사용자 정보를 확인할 수 없습니다.')
-    }
-
-    return currentUser
+    // 2. 기존 인증 상태를 초기화한다.
+    // 이후 Router에서 새로운 세션의 사용자 정보를 확인한다.
+    user.value = null
+    isInitialized.value = false
   }
 
   /**
