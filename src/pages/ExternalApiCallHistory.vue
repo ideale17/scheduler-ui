@@ -570,6 +570,10 @@ onUnmounted(() => {
                           <th class="px-3 py-2 text-center text-xs font-semibold text-gray-500">
                             요청순번
                           </th>
+                          <!-- 페이징 요청 시 실제 페이지 번호를 표시한다. -->
+                          <th class="px-3 py-2 text-center text-xs font-semibold text-gray-500">
+                            페이지
+                          </th>
                           <th class="px-3 py-2 text-center text-xs font-semibold text-gray-500">
                             호출 구분
                           </th>
@@ -599,6 +603,11 @@ onUnmounted(() => {
                         >
                           <td class="px-3 py-2 text-center text-gray-600">
                             {{ detail.requestSequence }}
+                          </td>
+
+                          <!-- 페이징을 사용하지 않은 경우에는 '-'를 표시한다. -->
+                          <td class="px-3 py-2 text-center text-gray-600">
+                            {{ detail.pageNo ?? '-' }}
                           </td>
 
                           <td class="px-3 py-2 text-center text-gray-600">
