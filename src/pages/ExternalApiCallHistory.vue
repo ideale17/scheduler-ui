@@ -1,9 +1,10 @@
 <script setup>
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   getExternalApiCallHistory,
   getExternalApiCallHistoryDetail,
+  getExternalApiCallAttemptDetail,
 } from '@/api/externalApiCallHistoryApi'
 
 // 화면 상태
@@ -20,6 +21,92 @@ const errorMessage = ref('')
 // 최신 요청만 결과에 반영하기 위한 식별자
 let listRequestId = 0
 let detailRequestId = 0
+
+// 호출 시도 상세 모달 상태
+const isAttemptModalOpen = ref(false)
+const attemptDetail = ref(null)
+const attemptDetailLoading = ref(false)
+const attemptDetailError = ref('')
+const attemptModalRef = ref(null)
+
+let attemptDetailRequestId = 0
+let attemptTrigger = null
+
+// 호출 시도 상세 정보를 조회하고 모달을 연다.
+const openAttemptDetail = async (apiCallLogId) => {
+  if (!apiCallLogId) {
+    return
+  }
+
+  const currentRequestId = ++attemptDetailRequestId
+
+  // 모달을 닫으면 원래 조작하던 요소로 포커스를 되돌린다.
+  if (!isAttemptModalOpen.value) {
+    attemptTrigger = document.activeElement
+  }
+
+  isAttemptModalOpen.value = true
+  attemptDetail.value = null
+  attemptDetailError.value = ''
+  attemptDetailLoading.value = true
+
+  await nextTick()
+  attemptModalRef.value?.focus()
+
+  try {
+    const response = await getExternalApiCallAttemptDetail(apiCallLogId)
+
+    if (currentRequestId !== attemptDetailRequestId) {
+      return
+    }
+
+    attemptDetail.value = {
+      ...response.data,
+      params: Array.isArray(response.data?.params) ? response.data.params : [],
+    }
+  } catch (error) {
+    if (currentRequestId !== attemptDetailRequestId) {
+      return
+    }
+
+    console.error('External API 호출 시도 상세 조회 실패:', error)
+    attemptDetailError.value = 'HTTP 호출 상세 정보를 불러오지 못했습니다.'
+  } finally {
+    if (currentRequestId === attemptDetailRequestId) {
+      attemptDetailLoading.value = false
+    }
+  }
+}
+
+// 호출 시도 상세 모달을 닫는다.
+const closeAttemptDetail = () => {
+  attemptDetailRequestId++
+  isAttemptModalOpen.value = false
+  attemptDetail.value = null
+  attemptDetailError.value = ''
+  attemptDetailLoading.value = false
+
+  attemptTrigger?.focus?.()
+  attemptTrigger = null
+}
+
+// 선택한 호출의 Raw Data 상세 화면으로 이동한다.
+const goAttemptRawDataDetail = () => {
+  const rawDataId = attemptDetail.value?.rawDataId
+
+  if (!rawDataId) {
+    return
+  }
+
+  const returnTo = route.fullPath
+
+  closeAttemptDetail()
+
+  router.push({
+    path: `/raw-data/${rawDataId}`,
+    query: { returnTo },
+  })
+}
 
 const searchCondition = ref({
   apiName: '',
@@ -599,7 +686,8 @@ onUnmounted(() => {
                         <tr
                           v-for="detail in detailList"
                           :key="detail.apiCallLogId"
-                          class="hover:bg-gray-50"
+                          class="cursor-pointer transition-colors hover:bg-gray-100"
+                          @click="openAttemptDetail(detail.apiCallLogId)"
                         >
                           <td class="px-3 py-2 text-center text-gray-600">
                             {{ detail.requestSequence }}
@@ -647,8 +735,36 @@ onUnmounted(() => {
                           </td>
 
                           <td class="max-w-xs px-3 py-2 text-gray-600">
-                            <div class="truncate" :title="detail.errorMessage || ''">
-                              {{ detail.errorMessage || '-' }}
+                            <div class="flex items-center justify-between gap-2">
+                              <div
+                                class="min-w-0 flex-1 truncate"
+                                :title="detail.errorMessage || ''"
+                              >
+                                {{ detail.errorMessage || '-' }}
+                              </div>
+
+                              <!-- 행 클릭 기능을 안내하고 키보드 접근성을 제공한다. -->
+                              <button
+                                type="button"
+                                class="shrink-0 rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900"
+                                :aria-label="`요청 ${detail.requestSequence}, ${detail.attemptNo === 1 ? '최초 호출' : `재시도 ${detail.attemptNo - 1}`} 상세 보기`"
+                                title="HTTP 요청 상세 보기"
+                                @click.stop="openAttemptDetail(detail.apiCallLogId)"
+                              >
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  class="h-4 w-4"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  stroke-width="2"
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                  aria-hidden="true"
+                                >
+                                  <path d="m9 18 6-6-6-6" />
+                                </svg>
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -722,5 +838,188 @@ onUnmounted(() => {
         다음
       </button>
     </div>
+
+    <Teleport to="body">
+      <!-- HTTP 요청 및 응답 상세 모달 -->
+      <div
+        v-if="isAttemptModalOpen"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        @click.self="closeAttemptDetail"
+      >
+        <div
+          ref="attemptModalRef"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="attempt-modal-title"
+          tabindex="-1"
+          class="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-white shadow-xl outline-none"
+          @keydown.esc.stop="closeAttemptDetail"
+        >
+          <!-- 헤더 -->
+          <div class="flex items-center justify-between border-b border-gray-200 px-5 py-4">
+            <h3 id="attempt-modal-title" class="text-base font-semibold text-gray-900">
+              HTTP 요청 및 응답 상세
+            </h3>
+
+            <button
+              type="button"
+              class="rounded-md px-2 py-1 text-gray-500 hover:bg-gray-100"
+              aria-label="닫기"
+              @click="closeAttemptDetail"
+            >
+              ✕
+            </button>
+          </div>
+
+          <!-- 본문 -->
+          <div class="space-y-5 overflow-y-auto p-5">
+            <div v-if="attemptDetailLoading" class="py-8 text-center text-sm text-gray-500">
+              상세 정보를 불러오는 중입니다.
+            </div>
+
+            <div
+              v-else-if="attemptDetailError"
+              role="alert"
+              class="rounded-md bg-red-50 p-4 text-sm text-red-700"
+            >
+              {{ attemptDetailError }}
+            </div>
+
+            <template v-else-if="attemptDetail">
+              <!-- 호출 결과 -->
+              <section>
+                <h4 class="mb-3 text-sm font-semibold text-gray-800">호출 정보</h4>
+
+                <div
+                  class="grid grid-cols-2 gap-4 rounded-md bg-gray-50 p-4 text-sm sm:grid-cols-4"
+                >
+                  <div>
+                    <div class="text-xs text-gray-500">요청순번</div>
+                    <div class="mt-1 font-medium">{{ attemptDetail.requestSequence ?? '-' }}</div>
+                  </div>
+
+                  <div>
+                    <div class="text-xs text-gray-500">페이지</div>
+                    <div class="mt-1 font-medium">{{ attemptDetail.pageNo ?? '-' }}</div>
+                  </div>
+
+                  <div>
+                    <div class="text-xs text-gray-500">호출 구분</div>
+                    <div class="mt-1 font-medium">
+                      {{
+                        attemptDetail.attemptNo === 1
+                          ? '최초 호출'
+                          : `재시도 ${attemptDetail.attemptNo - 1}`
+                      }}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div class="text-xs text-gray-500">상태</div>
+                    <div class="mt-1 font-medium">{{ attemptDetail.status || '-' }}</div>
+                  </div>
+
+                  <div>
+                    <div class="text-xs text-gray-500">HTTP</div>
+                    <div class="mt-1 font-medium">{{ attemptDetail.httpStatus ?? '-' }}</div>
+                  </div>
+
+                  <div>
+                    <div class="text-xs text-gray-500">호출 시간</div>
+                    <div class="mt-1 font-medium">
+                      {{ formatRunMillis(attemptDetail.runMillis) }}
+                    </div>
+                  </div>
+
+                  <div class="col-span-2">
+                    <div class="text-xs text-gray-500">시작시간</div>
+                    <div class="mt-1 font-medium">
+                      {{ formatDateTime(attemptDetail.startedAt) }}
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <!-- 요청 URL -->
+              <section>
+                <h4 class="mb-3 text-sm font-semibold text-gray-800">요청 정보</h4>
+
+                <template v-if="attemptDetail.requestId">
+                  <div class="mb-2 text-sm font-medium">
+                    {{ attemptDetail.requestMethod || '-' }}
+                  </div>
+                  <div class="break-all rounded-md bg-gray-50 p-3 text-sm text-gray-700">
+                    {{ attemptDetail.requestUrl || '-' }}
+                  </div>
+                </template>
+
+                <p v-else class="text-sm text-gray-500">이 호출에 저장된 요청 정보가 없습니다.</p>
+              </section>
+
+              <!-- 요청 파라미터 -->
+              <section>
+                <h4 class="mb-3 text-sm font-semibold text-gray-800">요청 파라미터</h4>
+
+                <div
+                  v-if="attemptDetail.params.length > 0"
+                  class="overflow-x-auto rounded-md border border-gray-200"
+                >
+                  <table class="w-full text-sm">
+                    <thead class="bg-gray-50 text-xs text-gray-500">
+                      <tr>
+                        <th class="px-3 py-2 text-left">위치</th>
+                        <th class="px-3 py-2 text-left">이름</th>
+                        <th class="px-3 py-2 text-left">값</th>
+                      </tr>
+                    </thead>
+
+                    <tbody class="divide-y divide-gray-100">
+                      <tr v-for="param in attemptDetail.params" :key="param.requestParamId">
+                        <td class="px-3 py-2">{{ param.paramLocation }}</td>
+                        <td class="break-all px-3 py-2">{{ param.paramName }}</td>
+                        <td class="break-all px-3 py-2">{{ param.paramValue ?? '-' }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <p v-else class="text-sm text-gray-500">저장된 요청 파라미터가 없습니다.</p>
+              </section>
+
+              <!-- 오류 메시지 -->
+              <section v-if="attemptDetail.errorMessage">
+                <h4 class="mb-3 text-sm font-semibold text-gray-800">오류 정보</h4>
+
+                <div
+                  class="whitespace-pre-wrap break-all rounded-md bg-red-50 p-3 text-sm text-red-700"
+                >
+                  {{ attemptDetail.errorMessage }}
+                </div>
+              </section>
+            </template>
+          </div>
+
+          <!-- 하단 -->
+          <div class="flex justify-end gap-2 border-t border-gray-200 px-5 py-4">
+            <button
+              v-if="attemptDetail?.rawDataId"
+              type="button"
+              class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              @click="goAttemptRawDataDetail"
+            >
+              Raw Data 상세 보기
+            </button>
+
+            <button
+              type="button"
+              class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
+              @click="closeAttemptDetail"
+            >
+              닫기
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
