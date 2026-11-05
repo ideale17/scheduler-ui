@@ -35,6 +35,48 @@ const getOffsetUnitLabel = (offsetUnit) => {
   return unitLabels[offsetUnit] || '-'
 }
 
+// 반복 방식에 따라 표시할 이름을 반환한다.
+const getRepeatTypeLabel = (repeatType) => {
+  const typeLabels = {
+    NONE: '반복 없음',
+    LIST: '목록 반복',
+    RANGE: '기간 반복',
+  }
+
+  return typeLabels[repeatType || 'NONE'] || '-'
+}
+
+// LIST 반복값을 표시 순서대로 반환한다.
+const getRepeatValues = (param) => {
+  if (!Array.isArray(param.repeatValues)) {
+    return []
+  }
+
+  return [...param.repeatValues].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+}
+
+// RANGE 반복으로 생성될 값의 개수를 계산한다.
+const getRepeatRangeCount = (param) => {
+  const start = param.repeatStart
+  const end = param.repeatEnd
+  const step = param.repeatStep
+
+  if (
+    start == null ||
+    end == null ||
+    step == null ||
+    !Number.isInteger(Number(start)) ||
+    !Number.isInteger(Number(end)) ||
+    !Number.isInteger(Number(step)) ||
+    Number(start) > Number(end) ||
+    Number(step) <= 0
+  ) {
+    return 0
+  }
+
+  return Math.floor((Number(end) - Number(start)) / Number(step)) + 1
+}
+
 const fetchExternalApiDetail = async () => {
   try {
     // 1. URL에서 External API 식별자를 조회한다.
@@ -453,6 +495,9 @@ onMounted(() => {
                   이동 값
                 </th>
                 <th class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500">
+                  반복 설정
+                </th>
+                <th class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500">
                   필수
                 </th>
                 <th class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500">
@@ -500,6 +545,60 @@ onMounted(() => {
                 <!-- 날짜·시간 이동 값 -->
                 <td class="px-4 py-3 text-center text-gray-600">
                   {{ param.offsetUnit ? (param.offsetValue ?? 0) : '-' }}
+                </td>
+
+                <!-- 반복 설정 -->
+                <td class="min-w-52 px-4 py-3 text-gray-600">
+                  <div v-if="!param.repeatType || param.repeatType === 'NONE'">
+                    <span class="text-sm text-gray-400">
+                      {{ getRepeatTypeLabel(param.repeatType) }}
+                    </span>
+                  </div>
+
+                  <!-- LIST: 등록된 반복 목록 -->
+                  <div v-else-if="param.repeatType === 'LIST'" class="space-y-1">
+                    <span class="text-xs font-semibold text-gray-900">
+                      {{ getRepeatTypeLabel(param.repeatType) }}
+                    </span>
+
+                    <div
+                      v-if="getRepeatValues(param).length > 0"
+                      class="flex max-w-72 flex-wrap gap-1"
+                    >
+                      <span
+                        v-for="(value, valueIndex) in getRepeatValues(param)"
+                        :key="value.repeatValueId ?? valueIndex"
+                        class="inline-flex rounded bg-gray-100 px-2 py-1 text-xs text-gray-700"
+                      >
+                        {{ value.paramValue }}
+                      </span>
+                    </div>
+
+                    <p v-else class="text-xs text-gray-400">등록된 반복값 없음</p>
+
+                    <p class="text-xs text-gray-500">총 {{ getRepeatValues(param).length }}개 값</p>
+                  </div>
+
+                  <!-- RANGE: 날짜 반복 범위 -->
+                  <div v-else-if="param.repeatType === 'RANGE'" class="space-y-1">
+                    <span class="text-xs font-semibold text-gray-900">
+                      {{ getRepeatTypeLabel(param.repeatType) }}
+                    </span>
+
+                    <p class="text-xs">반복 단위: {{ getOffsetUnitLabel(param.repeatUnit) }}</p>
+
+                    <p class="text-xs">
+                      범위: {{ param.repeatStart ?? '-' }}
+                      ~
+                      {{ param.repeatEnd ?? '-' }}
+                    </p>
+
+                    <p class="text-xs">간격: {{ param.repeatStep ?? 1 }}</p>
+
+                    <p class="text-xs text-gray-500">총 {{ getRepeatRangeCount(param) }}개 값</p>
+                  </div>
+
+                  <span v-else class="text-xs text-gray-400"> 알 수 없는 반복 방식 </span>
                 </td>
 
                 <td class="px-4 py-3 text-center">

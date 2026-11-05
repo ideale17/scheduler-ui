@@ -1,5 +1,5 @@
 <script setup>
-import { nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { createExternalApi } from '@/api/externalApi'
 import { setFieldError } from '@/utils/formValidation'
@@ -141,10 +141,16 @@ const getOffsetUnitOptions = (valueType) => {
   return offsetUnitOptions[valueType] || []
 }
 
-// 값 유형을 변경하면 사용하지 않는 오프셋 설정을 초기화한다.
+// 값 유형을 변경하면 사용하지 않는 오프셋과 반복 설정을 초기화한다.
 const changeParamValueType = (param) => {
   param.offsetUnit = ''
   param.offsetValue = 0
+  param.repeatType = 'NONE'
+  param.repeatUnit = ''
+  param.repeatStart = null
+  param.repeatEnd = null
+  param.repeatStep = 1
+  param.repeatValuesText = ''
 }
 
 // 이동 단위를 해제하면 이동 값을 초기화한다.
@@ -153,6 +159,79 @@ const changeOffsetUnit = (param) => {
     param.offsetValue = 0
   }
 }
+
+// 값 유형에서 사용할 수 있는 반복 방식을 반환한다.
+const getRepeatTypeOptions = (valueType) => {
+  if (valueType === 'STATIC') {
+    return [
+      { value: 'NONE', label: '반복 없음' },
+      { value: 'LIST', label: '목록 반복' },
+    ]
+  }
+
+  if (valueType === 'CURRENT_DATE') {
+    return [
+      { value: 'NONE', label: '반복 없음' },
+      { value: 'RANGE', label: '기간 반복' },
+    ]
+  }
+
+  return [{ value: 'NONE', label: '반복 없음' }]
+}
+
+// 반복 방식을 변경하면 사용하지 않는 설정을 초기화한다.
+const changeRepeatType = (param) => {
+  param.repeatUnit = ''
+  param.repeatStart = null
+  param.repeatEnd = null
+  param.repeatStep = 1
+  param.repeatValuesText = ''
+}
+
+// 반복 목록 입력값을 배열로 변환한다.
+const parseRepeatValues = (text) => {
+  return (text || '')
+    .split(/[\n,]+/)
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0)
+}
+
+// 파라미터별 반복 값 개수를 계산한다.
+const getRepeatValueCount = (param) => {
+  if (param.repeatType === 'LIST') {
+    return parseRepeatValues(param.repeatValuesText).length
+  }
+
+  if (param.repeatType === 'RANGE') {
+    const start = Number(param.repeatStart)
+    const end = Number(param.repeatEnd)
+    const step = Number(param.repeatStep)
+
+    if (
+      param.repeatStart === null ||
+      param.repeatEnd === null ||
+      param.repeatStart === '' ||
+      param.repeatEnd === '' ||
+      param.repeatStep === '' ||
+      !Number.isInteger(start) ||
+      !Number.isInteger(end) ||
+      !Number.isInteger(step) ||
+      step <= 0 ||
+      start > end
+    ) {
+      return 0
+    }
+
+    return Math.floor((end - start) / step) + 1
+  }
+
+  return 1
+}
+
+// 현재 파라미터 설정을 기준으로 예상 조합 수를 계산한다.
+const expectedCombinationCount = computed(() => {
+  return params.value.reduce((count, param) => count * getRepeatValueCount(param), 1)
+})
 
 // 날짜·시간 오프셋 입력값을 검증한다.
 const validateParamOffset = (param) => {
@@ -194,6 +273,89 @@ const validateParamOffset = (param) => {
   return ''
 }
 
+// 반복 설정 입력값을 검증한다.
+const validateParamRepeat = (param) => {
+  // 1. 반복하지 않는 파라미터는 검증하지 않는다.
+  if (param.repeatType === 'NONE') {
+    return ''
+  }
+
+  // 2. 목록 반복 설정을 검증한다.
+  if (param.repeatType === 'LIST') {
+    if (param.valueType !== 'STATIC') {
+      return '목록 반복은 STATIC 값 유형에서만 사용할 수 있습니다.'
+    }
+
+    const values = parseRepeatValues(param.repeatValuesText)
+
+    if (values.length === 0) {
+      return '반복 목록 값을 입력해주세요.'
+    }
+
+    if (values.length > 100) {
+      return '반복 목록은 최대 100개까지 등록할 수 있습니다.'
+    }
+
+    if (values.some((value) => value.length > 2000)) {
+      return '반복 목록의 각 값은 최대 2000자까지 입력할 수 있습니다.'
+    }
+
+    if (new Set(values).size !== values.length) {
+      return '반복 목록에 중복된 값이 있습니다.'
+    }
+
+    return ''
+  }
+
+  // 3. 기간 반복 설정을 검증한다.
+  if (param.repeatType === 'RANGE') {
+    if (param.valueType !== 'CURRENT_DATE') {
+      return '기간 반복은 CURRENT_DATE 값 유형에서만 사용할 수 있습니다.'
+    }
+
+    if (!['DAY', 'MONTH', 'YEAR'].includes(param.repeatUnit)) {
+      return '기간 반복 단위를 선택해주세요.'
+    }
+
+    const start = Number(param.repeatStart)
+    const end = Number(param.repeatEnd)
+    const step = Number(param.repeatStep)
+
+    if (
+      param.repeatStart === null ||
+      param.repeatEnd === null ||
+      param.repeatStart === '' ||
+      param.repeatEnd === '' ||
+      param.repeatStep === '' ||
+      !Number.isInteger(start) ||
+      !Number.isInteger(end) ||
+      !Number.isInteger(step)
+    ) {
+      return '반복 시작값, 종료값, 간격을 정수로 입력해주세요.'
+    }
+
+    if (start < -10000 || start > 10000 || end < -10000 || end > 10000) {
+      return '반복 시작값과 종료값은 -10000부터 10000까지 입력할 수 있습니다.'
+    }
+
+    if (start > end) {
+      return '반복 시작값은 종료값보다 클 수 없습니다.'
+    }
+
+    if (step <= 0) {
+      return '반복 간격은 1 이상이어야 합니다.'
+    }
+
+    if (getRepeatValueCount(param) > 100) {
+      return '기간 반복은 최대 100개의 값을 생성할 수 있습니다.'
+    }
+
+    return ''
+  }
+
+  return '지원하지 않는 반복 방식입니다.'
+}
+
 const createEmptyParam = () => {
   return {
     paramLocation: 'QUERY',
@@ -203,6 +365,12 @@ const createEmptyParam = () => {
     valueFormat: '',
     offsetUnit: '',
     offsetValue: 0,
+    repeatType: 'NONE',
+    repeatUnit: '',
+    repeatStart: null,
+    repeatEnd: null,
+    repeatStep: 1,
+    repeatValuesText: '',
     requiredYn: 'N',
     sortOrder: params.value.length + 1,
     description: '',
@@ -407,6 +575,7 @@ const validateForm = () => {
         paramValue: '',
         valueFormat: '',
         offsetValue: '',
+        repeat: '',
       }
     }
 
@@ -421,7 +590,12 @@ const validateForm = () => {
       return false
     }
 
-    if (param.valueType === 'STATIC' && !param.paramValue.trim() && param.requiredYn === 'Y') {
+    if (
+      param.valueType === 'STATIC' &&
+      param.repeatType === 'NONE' &&
+      !param.paramValue.trim() &&
+      param.requiredYn === 'Y'
+    ) {
       errors.value.params[i].paramValue = '필수 파라미터 값을 입력해주세요.'
       paramValueInputs.value[i]?.scrollIntoView({
         behavior: 'smooth',
@@ -450,6 +624,20 @@ const validateForm = () => {
       errors.value.params[i].offsetValue = offsetError
       return false
     }
+
+    // 9. 반복 파라미터 설정을 검증한다.
+    const repeatError = validateParamRepeat(param)
+
+    if (repeatError) {
+      errors.value.params[i].repeat = repeatError
+      return false
+    }
+  }
+
+  // 10. 전체 반복 조합 수를 검증한다.
+  if (expectedCombinationCount.value > 100) {
+    alert('External API 반복 조합은 최대 100개까지 설정할 수 있습니다.')
+    return false
   }
 
   return true
@@ -496,12 +684,42 @@ const addExternalApi = async () => {
           : null,
 
       params: params.value.map((param) => ({
-        ...param,
-        paramValue: param.valueType === 'STATIC' ? param.paramValue || null : null,
+        paramLocation: param.paramLocation,
+        paramName: param.paramName,
+        valueType: param.valueType,
+
+        paramValue:
+          param.valueType === 'STATIC' && param.repeatType === 'NONE'
+            ? param.paramValue || null
+            : null,
+
         valueFormat: param.valueType === 'STATIC' ? null : param.valueFormat || null,
+
         offsetUnit: param.valueType === 'STATIC' ? null : param.offsetUnit || null,
+
         offsetValue:
           param.valueType === 'STATIC' || !param.offsetUnit ? 0 : Number(param.offsetValue),
+
+        repeatType: param.repeatType,
+
+        repeatUnit: param.repeatType === 'RANGE' ? param.repeatUnit : null,
+
+        repeatStart: param.repeatType === 'RANGE' ? Number(param.repeatStart) : null,
+
+        repeatEnd: param.repeatType === 'RANGE' ? Number(param.repeatEnd) : null,
+
+        repeatStep: param.repeatType === 'RANGE' ? Number(param.repeatStep) : 1,
+
+        repeatValues:
+          param.repeatType === 'LIST'
+            ? parseRepeatValues(param.repeatValuesText).map((value, index) => ({
+                paramValue: value,
+                sortOrder: index + 1,
+              }))
+            : [],
+
+        requiredYn: param.requiredYn,
+        sortOrder: param.sortOrder,
         description: param.description || null,
       })),
     }
@@ -537,7 +755,7 @@ watch(
     <section class="rounded-lg border border-gray-200 bg-white p-5">
       <div class="mb-5">
         <h3 class="text-base font-semibold text-gray-900">기본 정보</h3>
-        <p class="mt-1 text-sm text-gray-500">External API의 기본 호출 정보를 설정합니다.</p>
+        <p class="mt-1 text-sm text-gray-500">API의 기본 호출 정보를 설정합니다.</p>
       </div>
 
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -1101,6 +1319,25 @@ watch(
               </select>
             </div>
 
+            <!-- 반복 방식 -->
+            <div>
+              <label class="mb-1 block text-sm font-medium text-gray-700"> 반복 방식 </label>
+
+              <select
+                v-model="param.repeatType"
+                class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-gray-500"
+                @change="changeRepeatType(param)"
+              >
+                <option
+                  v-for="option in getRepeatTypeOptions(param.valueType)"
+                  :key="option.value"
+                  :value="option.value"
+                >
+                  {{ option.label }}
+                </option>
+              </select>
+            </div>
+
             <div>
               <label class="mb-1 block text-sm font-medium text-gray-700"> 필수 여부 </label>
 
@@ -1117,7 +1354,11 @@ watch(
               <label class="mb-1 block text-sm font-medium text-gray-700">
                 값
                 <span
-                  v-if="param.valueType === 'STATIC' && param.requiredYn === 'Y'"
+                  v-if="
+                    param.valueType === 'STATIC' &&
+                    param.repeatType === 'NONE' &&
+                    param.requiredYn === 'Y'
+                  "
                   class="text-red-500"
                 >
                   *
@@ -1128,7 +1369,7 @@ watch(
                 :ref="(el) => (paramValueInputs[index] = el)"
                 v-model="param.paramValue"
                 type="text"
-                :disabled="param.valueType !== 'STATIC'"
+                :disabled="param.valueType !== 'STATIC' || param.repeatType !== 'NONE'"
                 class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-gray-500 disabled:bg-gray-100 disabled:text-gray-500"
                 @input="errors.params[index] && (errors.params[index].paramValue = '')"
               />
@@ -1224,6 +1465,107 @@ watch(
             </div>
           </div>
 
+          <!-- 반복 파라미터 설정 -->
+          <div
+            v-if="param.repeatType !== 'NONE'"
+            class="mt-4 rounded-lg border border-gray-200 bg-white p-4"
+          >
+            <div class="mb-3">
+              <h4 class="text-sm font-semibold text-gray-900">반복 설정</h4>
+              <p class="mt-1 text-xs text-gray-500">
+                반복할 값을 설정합니다. 다른 반복 파라미터와 모든 조합을 생성합니다.
+              </p>
+            </div>
+
+            <!-- 고정값 목록 반복 -->
+            <div v-if="param.repeatType === 'LIST'">
+              <label class="mb-1 block text-sm font-medium text-gray-700">
+                반복 목록
+                <span class="text-red-500">*</span>
+              </label>
+
+              <textarea
+                v-model="param.repeatValuesText"
+                rows="4"
+                placeholder="11680&#10;11110&#10;41370"
+                class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-gray-500"
+                @input="errors.params[index] && (errors.params[index].repeat = '')"
+              ></textarea>
+
+              <p class="mt-1 text-xs text-gray-500">
+                줄바꿈 또는 쉼표로 구분해서 입력합니다. 최대 100개까지 등록할 수 있습니다.
+              </p>
+            </div>
+
+            <!-- 날짜 범위 반복 -->
+            <div
+              v-if="param.repeatType === 'RANGE'"
+              class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4"
+            >
+              <div>
+                <label class="mb-1 block text-sm font-medium text-gray-700">반복 단위</label>
+
+                <select
+                  v-model="param.repeatUnit"
+                  class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-gray-500"
+                >
+                  <option value="">선택</option>
+                  <option value="DAY">일</option>
+                  <option value="MONTH">월</option>
+                  <option value="YEAR">년</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="mb-1 block text-sm font-medium text-gray-700">시작 오프셋</label>
+
+                <input
+                  v-model.number="param.repeatStart"
+                  type="number"
+                  min="-10000"
+                  max="10000"
+                  step="1"
+                  placeholder="-2"
+                  class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-gray-500"
+                />
+              </div>
+
+              <div>
+                <label class="mb-1 block text-sm font-medium text-gray-700">종료 오프셋</label>
+
+                <input
+                  v-model.number="param.repeatEnd"
+                  type="number"
+                  min="-10000"
+                  max="10000"
+                  step="1"
+                  placeholder="0"
+                  class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-gray-500"
+                />
+              </div>
+
+              <div>
+                <label class="mb-1 block text-sm font-medium text-gray-700">반복 간격</label>
+
+                <input
+                  v-model.number="param.repeatStep"
+                  type="number"
+                  min="1"
+                  step="1"
+                  class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-gray-500"
+                />
+              </div>
+            </div>
+
+            <p v-if="errors.params[index]?.repeat" class="mt-2 text-xs text-red-600">
+              {{ errors.params[index].repeat }}
+            </p>
+
+            <p class="mt-3 text-xs text-gray-500">
+              예상 반복 값: {{ getRepeatValueCount(param) }}개
+            </p>
+          </div>
+
           <div class="mt-3 flex justify-end">
             <button
               type="button"
@@ -1234,6 +1576,34 @@ watch(
             </button>
           </div>
         </div>
+      </div>
+
+      <!-- 전체 반복 조합 미리보기 -->
+      <div
+        v-if="params.some((param) => param.repeatType !== 'NONE')"
+        class="mt-4 rounded-lg border border-gray-200 bg-white p-4"
+      >
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h4 class="text-sm font-semibold text-gray-900">예상 실행 조합</h4>
+            <p class="mt-1 text-xs text-gray-500">각 반복 파라미터의 값 개수를 곱한 결과입니다.</p>
+          </div>
+
+          <div class="text-right">
+            <div class="text-xl font-semibold text-gray-900">
+              {{ expectedCombinationCount.toLocaleString() }}개
+            </div>
+            <p class="mt-1 text-xs text-gray-500">최대 100개</p>
+          </div>
+        </div>
+
+        <p v-if="expectedCombinationCount > 100" class="mt-2 text-xs text-red-600">
+          허용된 조합 수를 초과했습니다. 반복 목록이나 기간을 줄여주세요.
+        </p>
+
+        <p class="mt-2 text-xs text-gray-500">
+          실제 API 호출은 조합별 페이징 및 재시도 설정에 따라 추가로 발생할 수 있습니다.
+        </p>
       </div>
 
       <!-- 파라미터 추가 -->
