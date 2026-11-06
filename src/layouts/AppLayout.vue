@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
+import AppToast from '@/components/AppToast.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -109,6 +110,9 @@ const logout = async () => {
 
 <template>
   <div class="flex min-h-screen bg-gray-50 text-gray-900">
+    <!-- 전체 관리자 화면에서 사용하는 공통 알림 -->
+    <AppToast />
+
     <!-- 왼쪽 메뉴 -->
     <aside class="min-h-screen w-60 shrink-0 border-r border-gray-200 bg-white">
       <!-- 서비스명 -->

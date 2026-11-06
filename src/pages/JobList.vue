@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
+import { useToastStore } from '@/stores/toastStore'
 import {
   deleteJob as deleteJobApi,
   getJobList,
@@ -15,6 +16,15 @@ const authStore = useAuthStore()
 const jobList = ref([])
 const selectedJobKeys = ref([])
 const isRefreshing = ref(false)
+
+const toastStore = useToastStore()
+
+// 현재 실행 중인 일괄 작업을 관리한다.
+// null: 대기, run: 즉시 실행, resume: 시작, pause: 중지
+const processingAction = ref(null)
+
+// 현재 삭제 요청 중인 Job의 식별자를 관리한다.
+const deletingJobKey = ref(null)
 
 const getJobKey = (job) => {
   return `${job.jobGroup}:${job.jobName}`
@@ -52,6 +62,8 @@ const fetchJobList = async () => {
 }
 
 const refreshJobList = async () => {
+  if (isRefreshing.value || processingAction.value !== null) return
+
   if (isRefreshing.value) return
 
   isRefreshing.value = true
@@ -67,108 +79,126 @@ const refreshJobList = async () => {
 }
 
 const deleteJob = async (jobName, jobGroup) => {
-  if (!confirm(`정말 ${jobGroup} 그룹의 ${jobName} Job을 삭제하시겠습니까?`)) return
+  // 1. 다른 Job의 삭제 요청이 진행 중이면 중복 실행을 방지한다.
+  if (deletingJobKey.value !== null || processingAction.value !== null) {
+    return
+  }
+
+  // 2. 삭제할 Job의 식별자를 생성한다.
+  const jobKey = getJobKey({ jobName, jobGroup })
+
+  // 3. Job 삭제 여부를 확인한다.
+  if (!confirm(`정말 ${jobGroup} 그룹의 ${jobName} Job을 삭제하시겠습니까?`)) {
+    return
+  }
+
+  // 4. 삭제 요청 상태를 설정한다.
+  deletingJobKey.value = jobKey
 
   try {
+    // 5. Job 삭제 API를 호출한다.
     await deleteJobApi(jobName, jobGroup)
 
-    alert('삭제 성공')
+    // 6. 삭제된 Job의 체크박스 선택 상태를 제거한다.
+    selectedJobKeys.value = selectedJobKeys.value.filter((key) => key !== jobKey)
 
-    // 삭제 성공 후 최신 목록 다시 가져오기
-    await fetchJobList()
+    // 7. 삭제 성공 메시지를 표시한다.
+    toastStore.success('Job 삭제 완료', `${jobName} Job이 삭제되었습니다.`)
   } catch (error) {
-    console.error('삭제 실패:', error)
-    alert('삭제 실패')
+    console.error('Job 삭제 실패:', error)
+
+    // 8. 삭제 실패 시 오류 메시지를 표시한다.
+    toastStore.error('Job 삭제 실패', `${jobName} Job 삭제에 실패했습니다.`)
+    return
+  } finally {
+    // 9. 삭제 요청 상태를 해제한다.
+    deletingJobKey.value = null
   }
+
+  // 10. 삭제 성공 후 최신 Job 목록을 조회한다.
+  await fetchJobList()
 }
 
-const runSelectedJobs = async () => {
-  // 1. 선택된 Job이 있는지 확인한다.
-  if (selectedJobs.value.length === 0) {
-    alert('즉시 실행할 Job을 하나 이상 선택해주세요.')
+/**
+ * 선택한 Job에 대한 일괄 작업을 처리한다.
+ *
+ * @param {string} action 작업 종류
+ */
+const processSelectedJobs = async (action) => {
+  // 1. 다른 일괄 작업이 진행 중이면 중복 요청을 방지한다.
+  if (processingAction.value !== null || deletingJobKey.value !== null) {
     return
   }
 
-  // 2. 일괄 즉시 실행 여부를 확인한다.
-  if (!confirm(`선택한 ${selectedJobs.value.length}개의 Job을 즉시 실행하시겠습니까?`)) {
+  // 2. 작업 종류별 API와 메시지를 정의한다.
+  const actions = {
+    run: {
+      label: '즉시 실행',
+      api: runJobsApi,
+      completedTitle: 'Job 실행 요청 완료',
+      failedTitle: 'Job 실행 요청 실패',
+    },
+    resume: {
+      label: '시작',
+      api: resumeJobsApi,
+      completedTitle: 'Job 시작 완료',
+      failedTitle: 'Job 시작 요청 실패',
+    },
+    pause: {
+      label: '중지',
+      api: pauseJobsApi,
+      completedTitle: 'Job 중지 완료',
+      failedTitle: 'Job 중지 요청 실패',
+    },
+  }
+
+  const config = actions[action]
+
+  if (!config) {
     return
   }
+
+  // 3. 선택된 Job 목록을 확인한다.
+  const jobs = selectedJobs.value
+
+  if (jobs.length === 0) {
+    toastStore.warning('Job을 선택해주세요.', `${config.label}할 Job이 없습니다.`)
+    return
+  }
+
+  // 4. 일괄 작업 실행 여부를 확인한다.
+  if (!confirm(`선택한 ${jobs.length}개의 Job을 ${config.label}하시겠습니까?`)) {
+    return
+  }
+
+  // 5. API 요청 시작 전에 로딩 상태를 설정한다.
+  processingAction.value = action
 
   try {
-    // 3. 선택한 Job의 일괄 즉시 실행 API를 호출한다.
-    const response = await runJobsApi(selectedJobs.value)
+    // 6. 선택된 Job 목록으로 일괄 API를 호출한다.
+    const response = await config.api(jobs)
 
-    // 4. 실행 요청 결과를 사용자에게 안내한다.
-    alert(
-      `즉시 실행 요청 완료\n성공: ${response.data.successCount}건\n실패: ${response.data.failCount}건`,
-    )
+    const successCount = response.data.successCount
+    const failCount = response.data.failCount
+    const message = `성공 ${successCount}건 · 실패 ${failCount}건`
 
-    // 5. 선택 상태를 초기화하고 최신 목록을 조회한다.
+    // 7. 처리 결과에 따라 공통 알림을 표시한다.
+    if (failCount > 0) {
+      toastStore.warning(`일부 Job ${config.label} 실패`, message)
+    } else {
+      toastStore.success(config.completedTitle, message)
+    }
+
+    // 8. 선택 상태를 초기화하고 최신 Job 목록을 조회한다.
     selectedJobKeys.value = []
     await fetchJobList()
   } catch (error) {
-    console.error('일괄 즉시 실행 실패:', error)
-    alert('일괄 즉시 실행에 실패했습니다.')
-  }
-}
+    console.error(`Job 일괄 ${config.label} 실패:`, error)
 
-const pauseSelectedJobs = async () => {
-  // 1. 선택된 Job이 있는지 확인한다.
-  if (selectedJobs.value.length === 0) {
-    alert('중지할 Job을 하나 이상 선택해주세요.')
-    return
-  }
-
-  // 2. 일괄 중지 여부를 확인한다.
-  if (!confirm(`선택한 ${selectedJobs.value.length}개의 Job을 중지하시겠습니까?`)) {
-    return
-  }
-
-  try {
-    // 3. 선택한 Job의 일괄 중지 API를 호출한다.
-    const response = await pauseJobsApi(selectedJobs.value)
-
-    // 4. 중지 결과를 사용자에게 안내한다.
-    alert(
-      `Job 중지 완료\n성공: ${response.data.successCount}건\n실패: ${response.data.failCount}건`,
-    )
-
-    // 5. 선택 상태를 초기화하고 최신 목록을 조회한다.
-    selectedJobKeys.value = []
-    await fetchJobList()
-  } catch (error) {
-    console.error('일괄 중지 실패:', error)
-    alert('Job 일괄 중지에 실패했습니다.')
-  }
-}
-
-const resumeSelectedJobs = async () => {
-  // 1. 선택된 Job이 있는지 확인한다.
-  if (selectedJobs.value.length === 0) {
-    alert('시작할 Job을 하나 이상 선택해주세요.')
-    return
-  }
-
-  // 2. 일괄 시작 여부를 확인한다.
-  if (!confirm(`선택한 ${selectedJobs.value.length}개의 Job을 시작하시겠습니까?`)) {
-    return
-  }
-
-  try {
-    // 3. 선택한 Job의 일괄 시작 API를 호출한다.
-    const response = await resumeJobsApi(selectedJobs.value)
-
-    // 4. 시작 결과를 사용자에게 안내한다.
-    alert(
-      `Job 시작 완료\n성공: ${response.data.successCount}건\n실패: ${response.data.failCount}건`,
-    )
-
-    // 5. 선택 상태를 초기화하고 최신 목록을 조회한다.
-    selectedJobKeys.value = []
-    await fetchJobList()
-  } catch (error) {
-    console.error('일괄 시작 실패:', error)
-    alert('Job 일괄 시작에 실패했습니다.')
+    toastStore.error(config.failedTitle, '서버 요청에 실패했습니다. 다시 시도해주세요.')
+  } finally {
+    // 9. 성공과 실패 모두 로딩 상태를 해제한다.
+    processingAction.value = null
   }
 }
 
@@ -271,7 +301,7 @@ onMounted(() => {
       <div class="flex items-center gap-2">
         <button
           type="button"
-          :disabled="isRefreshing"
+          :disabled="isRefreshing || processingAction !== null"
           class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           @click="refreshJobList"
         >
@@ -306,11 +336,20 @@ onMounted(() => {
         <div class="group relative">
           <button
             type="button"
-            :disabled="selectedJobKeys.length === 0"
+            :disabled="
+              selectedJobKeys.length === 0 || processingAction !== null || deletingJobKey !== null
+            "
             class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-            @click="runSelectedJobs"
+            @click="processSelectedJobs('run')"
           >
-            즉시 실행
+            <span class="inline-flex items-center gap-2">
+              <span
+                v-if="processingAction === 'run'"
+                class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700"
+                aria-hidden="true"
+              ></span>
+              {{ processingAction === 'run' ? '실행 요청 중...' : '즉시 실행' }}
+            </span>
           </button>
 
           <div
@@ -322,11 +361,20 @@ onMounted(() => {
         <div class="group relative">
           <button
             type="button"
-            :disabled="selectedJobKeys.length === 0"
+            :disabled="
+              selectedJobKeys.length === 0 || processingAction !== null || deletingJobKey !== null
+            "
             class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-            @click="resumeSelectedJobs"
+            @click="processSelectedJobs('resume')"
           >
-            시작
+            <span class="inline-flex items-center gap-2">
+              <span
+                v-if="processingAction === 'resume'"
+                class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700"
+                aria-hidden="true"
+              ></span>
+              {{ processingAction === 'resume' ? '시작 처리 중...' : '시작' }}
+            </span>
           </button>
 
           <div
@@ -339,11 +387,20 @@ onMounted(() => {
         <div class="group relative">
           <button
             type="button"
-            :disabled="selectedJobKeys.length === 0"
+            :disabled="
+              selectedJobKeys.length === 0 || processingAction !== null || deletingJobKey !== null
+            "
             class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-            @click="pauseSelectedJobs"
+            @click="processSelectedJobs('pause')"
           >
-            중지
+            <span class="inline-flex items-center gap-2">
+              <span
+                v-if="processingAction === 'pause'"
+                class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700"
+                aria-hidden="true"
+              ></span>
+              {{ processingAction === 'pause' ? '중지 처리 중...' : '중지' }}
+            </span>
           </button>
           <div
             class="pointer-events-none absolute right-0 top-full z-10 mt-2 hidden w-64 rounded-md bg-gray-900 px-3 py-2 text-xs leading-5 text-white shadow-lg group-hover:block"
@@ -366,6 +423,7 @@ onMounted(() => {
               <input
                 v-model="allSelected"
                 type="checkbox"
+                :disabled="processingAction !== null"
                 class="h-4 w-4 rounded border-gray-300"
               />
             </th>
@@ -411,6 +469,7 @@ onMounted(() => {
                 v-model="selectedJobKeys"
                 type="checkbox"
                 :value="getJobKey(job)"
+                :disabled="processingAction !== null"
                 class="h-4 w-4 rounded border-gray-300"
               />
             </td>
@@ -488,10 +547,20 @@ onMounted(() => {
                 <button
                   v-if="authStore.isAdmin"
                   type="button"
-                  class="rounded-md px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+                  :disabled="deletingJobKey !== null"
+                  class="rounded-md px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                   @click="deleteJob(job.jobName, job.jobGroup)"
                 >
-                  삭제
+                  <span class="inline-flex items-center gap-1.5">
+                    <!-- 해당 Job 삭제 요청 중에만 스피너 표시 -->
+                    <span
+                      v-if="deletingJobKey === getJobKey(job)"
+                      class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-red-200 border-t-red-600"
+                      aria-hidden="true"
+                    ></span>
+
+                    {{ deletingJobKey === getJobKey(job) ? '삭제 중...' : '삭제' }}
+                  </span>
                 </button>
               </div>
             </td>

@@ -1,10 +1,16 @@
 <script setup>
 import { nextTick, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useToastStore } from '@/stores/toastStore'
 import { createJob, getJobClasses } from '@/api/jobApi'
 import { getExternalApiList } from '@/api/externalApi'
 
 const router = useRouter()
+const toastStore = useToastStore()
+
+// Job 등록 API 요청 상태를 관리한다.
+const isSubmitting = ref(false)
+
 const jobClasses = ref([])
 const paramList = ref([])
 const paramKeyInputs = ref([])
@@ -78,39 +84,54 @@ const buildParams = () => {
 }
 
 const addJob = async () => {
-  // 1. 입력값을 검증한다.
+  // 1. 이미 등록 요청 중이면 중복 실행을 방지한다.
+  if (isSubmitting.value) {
+    return
+  }
+
+  // 2. 입력값을 검증한다.
   if (!validateJob()) {
     return
   }
 
-  // 2. 등록 여부를 확인한다.
+  // 3. 등록 여부를 확인한다.
   if (
     !confirm(`${jobData.value.jobGroup} 그룹의 ${jobData.value.jobName} Job을 등록하시겠습니까?`)
   ) {
     return
   }
 
-  try {
-    // 3. Job 유형에 따라 실행 파라미터를 구성한다.
-    if (isExternalApiCallJob(jobData.value.jobClassName)) {
-      jobData.value.params = {
-        externalApiId: selectedExternalApiId.value,
-      }
-    } else {
-      jobData.value.params = buildParams()
+  // 4. Job 유형에 따라 실행 파라미터를 구성한다.
+  if (isExternalApiCallJob(jobData.value.jobClassName)) {
+    jobData.value.params = {
+      externalApiId: selectedExternalApiId.value,
     }
+  } else {
+    jobData.value.params = buildParams()
+  }
 
-    // 4. Job 등록 API를 호출한다.
+  // 5. 등록 요청 상태를 설정한다.
+  isSubmitting.value = true
+
+  try {
+    // 6. Job 등록 API를 호출한다.
     await createJob(jobData.value)
 
-    // 5. 등록 성공 후 목록 화면으로 이동한다.
-    alert('Job 등록 성공')
-
-    router.push('/jobList')
+    // 7. 등록 성공 메시지를 표시한다.
+    toastStore.success('Job 등록 완료', 'Job이 정상적으로 등록되었습니다.')
   } catch (error) {
     console.error('Job 등록 실패:', error)
-    alert('Job 등록에 실패했습니다.')
+
+    // 8. 등록 실패 시 입력값을 유지하고 오류를 안내한다.
+    toastStore.error('Job 등록 실패', 'Job 등록에 실패했습니다.')
+    return
+  } finally {
+    // 9. 등록 요청 상태를 해제한다.
+    isSubmitting.value = false
   }
+
+  // 10. 등록 성공 후 Job 목록 화면으로 이동한다.
+  await router.push('/jobList')
 }
 
 const validateJob = () => {
@@ -458,7 +479,8 @@ watch(
     <div class="flex justify-end gap-2">
       <button
         type="button"
-        class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        :disabled="isSubmitting"
+        class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
         @click="router.push('/jobList')"
       >
         취소
@@ -466,9 +488,19 @@ watch(
 
       <button
         type="submit"
-        class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
+        :disabled="isSubmitting"
+        class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        등록
+        <span class="inline-flex items-center gap-2">
+          <!-- 등록 요청 중 로딩 표시 -->
+          <span
+            v-if="isSubmitting"
+            class="h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-white"
+            aria-hidden="true"
+          ></span>
+
+          {{ isSubmitting ? '등록 중...' : '등록' }}
+        </span>
       </button>
     </div>
   </form>

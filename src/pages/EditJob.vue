@@ -1,11 +1,13 @@
 <script setup>
 import { nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useToastStore } from '@/stores/toastStore'
 import { getJob, updateJob } from '@/api/jobApi'
 import { getExternalApiList } from '@/api/externalApi'
 
 const route = useRoute()
 const router = useRouter()
+const toastStore = useToastStore()
 
 const isLoading = ref(false)
 const isSubmitting = ref(false)
@@ -96,25 +98,33 @@ const validateJob = () => {
 }
 
 const handleUpdateJob = async () => {
-  // 1. 입력값을 검증한다.
+  // 1. 이미 수정 요청 중이면 중복 실행을 방지한다.
+  if (isSubmitting.value) {
+    return
+  }
+
+  // 2. 입력값을 검증한다.
   if (!validateJob()) {
     return
   }
 
-  // 2. 수정 여부를 확인한다.
+  // 3. 수정 여부를 확인한다.
   if (
     !confirm(`${jobData.value.jobGroup} 그룹의 ${jobData.value.jobName} Job을 수정하시겠습니까?`)
   ) {
     return
   }
 
-  // 3. Job 유형에 따라 실행 파라미터를 구성한다.
+  // 4. Job 유형에 따라 실행 파라미터를 구성한다.
   const params = isExternalApiCallJob(jobData.value.jobClassName)
     ? { externalApiId: selectedExternalApiId.value }
     : buildParams()
 
+  // 5. 수정 요청 상태를 설정한다.
+  isSubmitting.value = true
+
   try {
-    // 4. Job 수정 API를 호출한다.
+    // 6. Job 수정 API를 호출한다.
     await updateJob({
       jobName: jobData.value.jobName,
       jobGroup: jobData.value.jobGroup,
@@ -124,14 +134,21 @@ const handleUpdateJob = async () => {
       params,
     })
 
-    // 5. 수정 성공 후 목록 화면으로 이동한다.
-    alert('Job 수정 성공')
-
-    router.push('/jobList')
+    // 7. 수정 성공 메시지를 표시한다.
+    toastStore.success('Job 수정 완료', 'Job 정보가 정상적으로 수정되었습니다.')
   } catch (error) {
     console.error('Job 수정 실패:', error)
-    alert('Job 수정에 실패했습니다.')
+
+    // 8. 수정 실패 시 입력값을 유지하고 오류를 안내한다.
+    toastStore.error('Job 수정 실패', 'Job 수정에 실패했습니다.')
+    return
+  } finally {
+    // 9. 수정 요청 상태를 해제한다.
+    isSubmitting.value = false
   }
+
+  // 10. 수정 성공 후 Job 목록 화면으로 이동한다.
+  await router.push('/jobList')
 }
 
 const addParam = async () => {
@@ -481,7 +498,16 @@ onMounted(() => {
           :disabled="isSubmitting"
           class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {{ isSubmitting ? '수정 중...' : '수정' }}
+          <span class="inline-flex items-center gap-2">
+            <!-- 수정 요청 중 로딩 표시 -->
+            <span
+              v-if="isSubmitting"
+              class="h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-white"
+              aria-hidden="true"
+            ></span>
+
+            {{ isSubmitting ? '수정 중...' : '수정' }}
+          </span>
         </button>
       </div>
     </form>
