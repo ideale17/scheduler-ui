@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useToastStore } from '@/stores/toastStore'
 import {
   getExternalApi,
   getExternalApiPaging,
@@ -20,6 +21,11 @@ import { moveToField, setFieldError } from '@/utils/formValidation'
 
 const route = useRoute()
 const router = useRouter()
+
+const toastStore = useToastStore()
+
+// 현재 진행 중인 저장 또는 삭제 작업을 관리한다.
+const processingAction = ref(null)
 
 const apiNameInput = ref(null)
 const apiUrlInput = ref(null)
@@ -140,7 +146,6 @@ const savedAuthType = ref('NONE')
 // 자동 가공 규칙 설정
 const transformRuleOptions = ref([])
 const autoConfigs = ref([])
-const isSavingAutoConfigs = ref(false)
 const autoConfigError = ref('')
 
 const fetchExternalApi = async () => {
@@ -855,21 +860,29 @@ const validateParams = () => {
 }
 
 const saveBasicInfo = async () => {
-  // 1. 기본 정보 입력값을 검증한다.
+  // 다른 작업이 진행 중이면 중복 요청을 방지한다.
+  if (processingAction.value !== null) {
+    return
+  }
+
+  // 기본 정보 입력값을 검증한다.
   if (!validateBasicInfo()) {
     return
   }
 
-  // 2. 수정 여부를 확인한다.
+  // 수정 여부를 확인한다.
   if (!confirm('기본 정보를 수정하시겠습니까?')) {
     return
   }
 
+  // 기본 정보 저장 상태를 설정한다.
+  processingAction.value = 'basic'
+
   try {
-    // 3. 재시도를 사용하지 않으면 관련 값을 0으로 설정한다.
+    // 재시도를 사용하지 않으면 관련 값을 0으로 설정한다.
     const retryEnabled = externalApi.value.retryEnabled
 
-    // 4. 기본 정보 수정 요청 데이터를 구성한다.
+    // 기본 정보 수정 요청 데이터를 구성한다.
     const basic = {
       apiName: externalApi.value.apiName,
       apiUrl: externalApi.value.apiUrl,
@@ -883,36 +896,46 @@ const saveBasicInfo = async () => {
       description: externalApi.value.description || null,
     }
 
-    // 5. External API 기본 정보를 수정한다.
+    // External API 기본 정보를 수정한다.
     await updateExternalApiBasic(route.params.externalApiId, basic)
 
-    // 6. 수정된 정보를 다시 조회한다.
+    // 수정된 정보를 다시 조회한다.
     await fetchExternalApi()
 
-    // 7. 수정 성공 결과를 표시한다.
-    alert('External API 기본 정보 수정 성공')
+    // 수정 성공 결과를 표시한다.
+    toastStore.success('기본 정보 수정 완료', '외부 API 기본 정보가 수정되었습니다.')
   } catch (error) {
     console.error('External API 기본 정보 수정 실패:', error)
-    alert('External API 기본 정보 수정 실패')
+    toastStore.error('기본 정보 수정 실패', '외부 API 기본 정보 수정에 실패했습니다.')
+  } finally {
+    // 저장 요청 상태를 해제한다.
+    processingAction.value = null
   }
 }
 
 const saveAuthInfo = async () => {
-  // 1. 인증 정보 입력값을 검증한다.
+  // 다른 작업이 진행 중이면 중복 요청을 방지한다.
+  if (processingAction.value !== null) {
+    return
+  }
+
+  // 인증 정보 입력값을 검증한다.
   if (!validateAuthInfo()) {
     return
   }
 
-  // 2. 수정 여부를 확인한다.
   if (!confirm('인증 정보를 수정하시겠습니까?')) {
     return
   }
 
+  // 인증 정보 저장 상태를 설정한다.
+  processingAction.value = 'auth'
+
   try {
-    // 3. 현재 인증 방식을 확인한다.
+    // 현재 인증 방식을 확인한다.
     const authType = externalApi.value.authType
 
-    // 4. 인증 방식에 따라 수정 요청 데이터를 구성한다.
+    // 인증 방식에 따라 수정 요청 데이터를 구성한다.
     const auth = {
       authType,
       authLocation: authType === 'API_KEY' ? externalApi.value.authLocation || null : null,
@@ -925,62 +948,79 @@ const saveAuthInfo = async () => {
       authPassword: authType === 'BASIC' ? externalApi.value.authPassword || null : null,
     }
 
-    // 5. External API 인증 정보를 수정한다.
+    // External API 인증 정보를 수정한다.
     await updateExternalApiAuth(route.params.externalApiId, auth)
 
-    // 6. 수정된 정보를 다시 조회한다.
+    // 수정된 정보를 다시 조회한다.
     await fetchExternalApi()
 
-    // 7. 수정 성공 결과를 표시한다.
-    alert('External API 인증 정보 수정 성공')
+    toastStore.success('인증 정보 수정 완료', '외부 API 인증 정보가 수정되었습니다.')
   } catch (error) {
     console.error('External API 인증 정보 수정 실패:', error)
-    alert('External API 인증 정보 수정 실패')
+    toastStore.error('인증 정보 수정 실패', '외부 API 인증 정보 수정에 실패했습니다.')
+  } finally {
+    processingAction.value = null
   }
 }
 
 const savePaging = async () => {
-  // 1. 페이징 설정을 검증한다.
+  // 다른 작업이 진행 중이면 중복 요청을 방지한다.
+  if (processingAction.value !== null) {
+    return
+  }
+
+  // 페이징 설정을 검증한다.
   if (!validatePaging()) {
     return
   }
 
-  // 2. 저장 여부를 확인한다.
+  // 저장 여부를 확인한다.
   if (!confirm('페이징 설정을 저장하시겠습니까?')) {
     return
   }
 
+  // 저장 상태를 설정한다.
+  processingAction.value = 'paging'
+
   try {
-    // 3. External API 페이징 설정을 저장한다.
+    // External API 페이징 설정을 저장한다.
     await saveExternalApiPaging(route.params.externalApiId, paging.value)
 
-    // 4. 페이징 설정 상태를 갱신한다.
+    // 페이징 설정 상태를 갱신한다.
     pagingConfigured.value = true
 
-    // 5. 수정된 정보를 다시 조회한다.
+    // 수정된 정보를 다시 조회한다.
     await fetchExternalApi()
 
-    // 6. 저장 성공 결과를 표시한다.
-    alert('External API 페이징 설정 저장 성공')
+    toastStore.success('페이징 설정 저장 완료', '페이징 설정이 저장되었습니다.')
   } catch (error) {
     console.error('External API 페이징 설정 저장 실패:', error)
-    alert('External API 페이징 설정 저장 실패')
+    toastStore.error('페이징 설정 저장 실패', '페이징 설정 저장에 실패했습니다.')
+  } finally {
+    processingAction.value = null
   }
 }
 
 const saveParams = async () => {
-  // 1. 파라미터 입력값을 검증한다.
+  // 다른 작업이 진행 중이면 중복 요청을 방지한다.
+  if (processingAction.value !== null) {
+    return
+  }
+
+  // 파라미터 입력값을 검증한다.
   if (!validateParams()) {
     return
   }
 
-  // 2. 수정 여부를 확인한다.
+  // 수정 여부를 확인한다.
   if (!confirm('파라미터 정보를 수정하시겠습니까?')) {
     return
   }
 
+  processingAction.value = 'params'
+
   try {
-    // 3. 백엔드 수정 요청 형식으로 파라미터를 구성한다.
+    // 백엔드 수정 요청 형식으로 파라미터를 구성한다.
     const requestParams = params.value.map((param) => {
       const repeatType = param.repeatType || 'NONE'
 
@@ -1014,44 +1054,55 @@ const saveParams = async () => {
       }
     })
 
-    // 4. External API 파라미터를 수정한다.
+    // External API 파라미터를 수정한다.
     await updateExternalApiParams(route.params.externalApiId, requestParams)
 
-    // 5. 수정된 정보를 다시 조회한다.
+    // 수정된 정보를 다시 조회한다.
     await fetchExternalApi()
 
-    // 6. 수정 성공 결과를 표시한다.
-    alert('External API 파라미터 수정 성공')
+    // 수정 성공 결과를 표시한다.
+    toastStore.success('파라미터 수정 완료', '외부 API 파라미터가 수정되었습니다.')
   } catch (error) {
     console.error('External API 파라미터 수정 실패:', error)
-    alert('External API 파라미터 수정 실패')
+    toastStore.error('파라미터 수정 실패', '외부 API 파라미터 수정에 실패했습니다.')
+  } finally {
+    processingAction.value = null
   }
 }
 
 const removePaging = async () => {
-  // 1. 등록된 페이징 설정이 없으면 종료한다.
-  if (!pagingConfigured.value) {
-    alert('삭제할 페이징 설정이 없습니다.')
+  // 다른 작업이 진행 중이면 중복 요청을 방지한다.
+  if (processingAction.value !== null) {
     return
   }
 
-  // 2. 삭제 여부를 확인한다.
+  // 등록된 페이징 설정이 없으면 종료한다.
+  if (!pagingConfigured.value) {
+    toastStore.warning('삭제할 페이징 설정이 없습니다.')
+    return
+  }
+
+  // 삭제 여부를 확인한다.
   if (!confirm('페이징 설정을 삭제하시겠습니까?')) {
     return
   }
 
+  // 페이징 설정 삭제 상태를 설정한다.
+  processingAction.value = 'deletePaging'
+
   try {
-    // 3. External API 페이징 설정을 삭제한다.
+    // External API 페이징 설정을 삭제한다.
     await deleteExternalApiPaging(route.params.externalApiId)
 
-    // 4. 수정된 정보를 다시 조회한다.
+    // 수정된 정보를 다시 조회한다.
     await fetchExternalApi()
 
-    // 5. 삭제 성공 결과를 표시한다.
-    alert('External API 페이징 설정 삭제 성공')
+    toastStore.success('페이징 설정 삭제 완료', '페이징 설정이 삭제되었습니다.')
   } catch (error) {
     console.error('External API 페이징 설정 삭제 실패:', error)
-    alert('External API 페이징 설정 삭제 실패')
+    toastStore.error('페이징 설정 삭제 실패', '페이징 설정 삭제에 실패했습니다.')
+  } finally {
+    processingAction.value = null
   }
 }
 
@@ -1095,12 +1146,12 @@ const isAutoRuleDisabled = (transformRuleId, currentIndex) => {
 
 // 자동 가공 규칙 연결 설정 저장
 const saveAutoConfigs = async () => {
-  // 1. 중복 저장을 방지한다.
-  if (isSavingAutoConfigs.value) {
+  // 다른 작업이 진행 중이면 중복 요청을 방지한다.
+  if (processingAction.value !== null) {
     return
   }
 
-  // 2. 가공 규칙 중복 여부를 검증한다.
+  // 가공 규칙 중복 여부를 검증한다.
   const transformRuleIds = autoConfigs.value.map((config) => config.transformRuleId)
 
   if (new Set(transformRuleIds).size !== transformRuleIds.length) {
@@ -1108,25 +1159,24 @@ const saveAutoConfigs = async () => {
     return
   }
 
-  // 3. 저장 여부를 확인한다.
   if (!confirm('자동 가공 규칙 연결 설정을 저장하시겠습니까?')) {
     return
   }
 
-  isSavingAutoConfigs.value = true
+  processingAction.value = 'autoConfig'
   autoConfigError.value = ''
 
   try {
-    // 4. 저장 요청 데이터를 구성한다.
+    // 저장 요청 데이터를 구성한다.
     const configs = autoConfigs.value.map((config) => ({
       transformRuleId: config.transformRuleId,
       enabled: config.enabled,
     }))
 
-    // 5. 자동 가공 규칙 연결 설정을 저장한다.
+    // 자동 가공 규칙 연결 설정을 저장한다.
     await updateTransformAutoConfigs(route.params.externalApiId, configs)
 
-    // 6. 저장된 연결 설정을 다시 조회한다.
+    // 저장된 연결 설정을 다시 조회한다.
     const response = await getTransformAutoConfigList(route.params.externalApiId)
 
     autoConfigs.value = Array.isArray(response.data)
@@ -1136,8 +1186,7 @@ const saveAutoConfigs = async () => {
         }))
       : []
 
-    // 7. 저장 성공 결과를 표시한다.
-    alert('자동 가공 규칙 연결 설정 저장 성공')
+    toastStore.success('자동 가공 설정 저장 완료', '자동 가공 규칙 연결 설정이 저장되었습니다.')
   } catch (error) {
     console.error('자동 가공 규칙 연결 설정 저장 실패:', error)
 
@@ -1145,8 +1194,10 @@ const saveAutoConfigs = async () => {
       typeof error.response?.data === 'string'
         ? error.response.data
         : '자동 가공 규칙 연결 설정을 저장하지 못했습니다.'
+
+    toastStore.error('자동 가공 설정 저장 실패', '자동 가공 규칙 연결 설정을 저장하지 못했습니다.')
   } finally {
-    isSavingAutoConfigs.value = false
+    processingAction.value = null
   }
 }
 
@@ -1313,10 +1364,19 @@ onMounted(() => {
         <div class="mt-5 flex justify-end">
           <button
             type="button"
-            class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
+            :disabled="processingAction !== null"
+            class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
             @click="saveBasicInfo"
           >
-            기본 정보 저장
+            <span class="inline-flex items-center gap-2">
+              <span
+                v-if="processingAction === 'basic'"
+                class="h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-white"
+                aria-hidden="true"
+              ></span>
+
+              {{ processingAction === 'basic' ? '저장 중...' : '기본 정보 저장' }}
+            </span>
           </button>
         </div>
       </section>
@@ -1495,10 +1555,19 @@ onMounted(() => {
         <div class="mt-5 flex justify-end">
           <button
             type="button"
-            class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
+            :disabled="processingAction !== null"
+            class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
             @click="saveAuthInfo"
           >
-            인증 정보 저장
+            <span class="inline-flex items-center gap-2">
+              <span
+                v-if="processingAction === 'auth'"
+                class="h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-white"
+                aria-hidden="true"
+              ></span>
+
+              {{ processingAction === 'auth' ? '저장 중...' : '인증 정보 저장' }}
+            </span>
           </button>
         </div>
       </section>
@@ -1701,18 +1770,36 @@ onMounted(() => {
           <button
             v-if="pagingConfigured"
             type="button"
-            class="rounded-md border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+            :disabled="processingAction !== null"
+            class="rounded-md border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
             @click="removePaging"
           >
-            페이징 설정 삭제
+            <span class="inline-flex items-center gap-2">
+              <span
+                v-if="processingAction === 'deletePaging'"
+                class="h-4 w-4 animate-spin rounded-full border-2 border-red-200 border-t-red-600"
+                aria-hidden="true"
+              ></span>
+
+              {{ processingAction === 'deletePaging' ? '삭제 중...' : '페이징 설정 삭제' }}
+            </span>
           </button>
 
           <button
             type="button"
-            class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
+            :disabled="processingAction !== null"
+            class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
             @click="savePaging"
           >
-            페이징 설정 저장
+            <span class="inline-flex items-center gap-2">
+              <span
+                v-if="processingAction === 'paging'"
+                class="h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-white"
+                aria-hidden="true"
+              ></span>
+
+              {{ processingAction === 'paging' ? '저장 중...' : '페이징 설정 저장' }}
+            </span>
           </button>
         </div>
       </section>
@@ -2073,10 +2160,19 @@ onMounted(() => {
 
           <button
             type="button"
-            class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
+            :disabled="processingAction !== null"
+            class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
             @click="saveParams"
           >
-            파라미터 저장
+            <span class="inline-flex items-center gap-2">
+              <span
+                v-if="processingAction === 'params'"
+                class="h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-white"
+                aria-hidden="true"
+              ></span>
+
+              {{ processingAction === 'params' ? '저장 중...' : '파라미터 저장' }}
+            </span>
           </button>
         </div>
       </section>
@@ -2169,7 +2265,7 @@ onMounted(() => {
           <button
             type="button"
             :disabled="
-              isSavingAutoConfigs ||
+              processingAction !== null ||
               !transformRuleOptions.some(
                 (rule) =>
                   rule.enabled === 'Y' &&
@@ -2184,11 +2280,19 @@ onMounted(() => {
 
           <button
             type="button"
-            :disabled="isSavingAutoConfigs"
+            :disabled="processingAction !== null"
             class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
             @click="saveAutoConfigs"
           >
-            {{ isSavingAutoConfigs ? '저장 중...' : '자동 가공 설정 저장' }}
+            <span class="inline-flex items-center gap-2">
+              <span
+                v-if="processingAction === 'autoConfig'"
+                class="h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-white"
+                aria-hidden="true"
+              ></span>
+
+              {{ processingAction === 'autoConfig' ? '저장 중...' : '자동 가공 설정 저장' }}
+            </span>
           </button>
         </div>
       </section>
@@ -2197,7 +2301,8 @@ onMounted(() => {
       <div class="flex justify-end gap-2">
         <button
           type="button"
-          class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          :disabled="processingAction !== null"
+          class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           @click="router.push('/externalApi')"
         >
           목록
@@ -2205,7 +2310,8 @@ onMounted(() => {
 
         <button
           type="button"
-          class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          :disabled="processingAction !== null"
+          class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           @click="router.push(`/externalApi/${route.params.externalApiId}`)"
         >
           상세

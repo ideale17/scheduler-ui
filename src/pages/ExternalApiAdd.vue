@@ -1,10 +1,16 @@
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useToastStore } from '@/stores/toastStore'
 import { createExternalApi } from '@/api/externalApi'
 import { setFieldError } from '@/utils/formValidation'
 
 const router = useRouter()
+
+const toastStore = useToastStore()
+
+// External API 등록 요청 상태를 관리한다.
+const isSubmitting = ref(false)
 
 const apiNameInput = ref(null)
 const apiUrlInput = ref(null)
@@ -644,6 +650,12 @@ const validateForm = () => {
 }
 
 const addExternalApi = async () => {
+  // 등록 요청 중에는 중복 실행을 방지한다.
+  if (isSubmitting.value) {
+    return
+  }
+
+  // 입력값을 검증한다.
   if (!validateForm()) {
     return
   }
@@ -657,11 +669,14 @@ const addExternalApi = async () => {
     externalApi.value.retryIntervalSec = 0
   }
 
+  // 등록 요청 상태를 설정한다.
+  isSubmitting.value = true
+
   try {
-    // 1. 현재 인증 방식을 조회한다.
+    // 현재 인증 방식을 조회한다.
     const authType = externalApi.value.authType
 
-    // 2. 백엔드 등록 요청 형식으로 데이터를 구성한다.
+    // 백엔드 등록 요청 형식으로 데이터를 구성한다.
     const requestData = {
       externalApi: {
         ...externalApi.value,
@@ -724,16 +739,21 @@ const addExternalApi = async () => {
       })),
     }
 
-    // 3. External API 등록 API를 호출한다.
+    // External API 등록 API를 호출한다.
     await createExternalApi(requestData)
 
-    // 4. 등록 완료 후 목록 화면으로 이동한다.
-    alert('External API 등록 성공')
-    router.push('/externalApi')
+    toastStore.success('외부 API 등록 완료', '외부 API가 정상적으로 등록되었습니다.')
   } catch (error) {
     console.error('External API 등록 실패:', error)
-    alert('External API 등록 실패')
+    toastStore.error('외부 API 등록 실패', '외부 API 등록에 실패했습니다.')
+    return
+  } finally {
+    // 7. 성공과 실패 모두 로딩 상태를 해제한다.
+    isSubmitting.value = false
   }
+
+  // 등록 성공 후 목록 화면으로 이동한다.
+  await router.push('/externalApi')
 }
 
 watch(
@@ -1622,7 +1642,8 @@ watch(
     <div class="flex justify-end gap-2">
       <button
         type="button"
-        class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        :disabled="isSubmitting"
+        class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
         @click="router.push('/externalApi')"
       >
         취소
@@ -1630,10 +1651,20 @@ watch(
 
       <button
         type="button"
-        class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
+        :disabled="isSubmitting"
+        class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
         @click="addExternalApi"
       >
-        등록
+        <span class="inline-flex items-center gap-2">
+          <!-- 등록 요청 중 로딩 표시 -->
+          <span
+            v-if="isSubmitting"
+            class="h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-white"
+            aria-hidden="true"
+          ></span>
+
+          {{ isSubmitting ? '등록 중...' : '등록' }}
+        </span>
       </button>
     </div>
   </div>

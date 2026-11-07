@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
+import { useToastStore } from '@/stores/toastStore'
 import {
   deleteExternalApi,
   executeExternalApi,
@@ -14,13 +15,16 @@ import { getTransformAutoConfigList } from '@/api/transformAutoConfigApi'
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const toastStore = useToastStore()
 
 const externalApi = ref(null)
 const paging = ref(null)
 const params = ref([])
 const autoConfigs = ref([])
 const loading = ref(true)
-const isExecuting = ref(false)
+
+// 즉시 실행 및 삭제 요청 상태를 구분한다.
+const processingAction = ref(null)
 
 // 날짜·시간 오프셋 단위를 화면에 표시할 이름으로 변환한다.
 const getOffsetUnitLabel = (offsetUnit) => {
@@ -106,7 +110,8 @@ const fetchExternalApiDetail = async () => {
 }
 
 const executeApi = async () => {
-  if (!externalApi.value || isExecuting.value) {
+  // API 정보가 없거나 다른 작업이 진행 중이면 종료한다.
+  if (!externalApi.value || processingAction.value !== null) {
     return
   }
 
@@ -114,17 +119,23 @@ const executeApi = async () => {
     return
   }
 
-  isExecuting.value = true
+  // 즉시 실행 요청 상태를 설정한다.
+  processingAction.value = 'execute'
 
   try {
+    // External API 즉시 실행 API를 호출한다.
     await executeExternalApi(externalApi.value.externalApiId)
 
-    alert('External API 호출 성공')
+    toastStore.success(
+      '외부 API 실행 완료',
+      `${externalApi.value.apiName} API 호출 처리가 완료되었습니다.`,
+    )
   } catch (error) {
     console.error('External API 호출 실패:', error)
-    alert('External API 호출 실패')
+    toastStore.error('외부 API 실행 실패', `${externalApi.value.apiName} API 실행에 실패했습니다.`)
   } finally {
-    isExecuting.value = false
+    // 즉시 실행 요청 상태를 해제한다.
+    processingAction.value = null
   }
 }
 
@@ -149,7 +160,8 @@ const getMethodClass = (httpMethod) => {
 }
 
 const deleteApi = async () => {
-  if (!externalApi.value) {
+  // API 정보가 없거나 다른 작업이 진행 중이면 종료한다.
+  if (!externalApi.value || processingAction.value !== null) {
     return
   }
 
@@ -157,17 +169,36 @@ const deleteApi = async () => {
     return
   }
 
+  // 삭제 요청 상태를 설정한다.
+  processingAction.value = 'delete'
+
   try {
+    // External API 삭제 API를 호출한다.
     await deleteExternalApi(externalApi.value.externalApiId)
 
-    alert('External API 삭제 성공')
-    router.push('/externalApi')
+    // 삭제 완료 메시지를 표시한다.
+    toastStore.success('외부 API 삭제 완료', `${externalApi.value.apiName} API가 삭제되었습니다.`)
   } catch (error) {
     console.error('External API 삭제 실패:', error)
 
-    const message = error.response?.data || 'External API 삭제에 실패했습니다.'
-    alert(message)
+    // 예상 가능한 업무 오류는 서버에서 반환한 메시지를 사용한다.
+    const status = error.response?.status
+
+    const message =
+      (status === 409 || status === 404) && typeof error.response?.data === 'string'
+        ? error.response.data
+        : '외부 API 삭제 중 오류가 발생했습니다.'
+
+    toastStore.error('외부 API 삭제 실패', message)
+
+    return
+  } finally {
+    // 삭제 요청 상태를 해제한다.
+    processingAction.value = null
   }
+
+  // 삭제 성공 후 API 목록 화면으로 이동한다.
+  await router.push('/externalApi')
 }
 
 onMounted(() => {
@@ -198,17 +229,27 @@ onMounted(() => {
             <button
               v-if="authStore.isAdmin"
               type="button"
-              :disabled="isExecuting"
+              :disabled="processingAction !== null"
               class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
               @click="executeApi"
             >
-              {{ isExecuting ? '실행 중...' : '즉시 실행' }}
+              <span class="inline-flex items-center gap-2">
+                <!-- 즉시 실행 요청 중 로딩 표시 -->
+                <span
+                  v-if="processingAction === 'execute'"
+                  class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700"
+                  aria-hidden="true"
+                ></span>
+
+                {{ processingAction === 'execute' ? '실행 중...' : '즉시 실행' }}
+              </span>
             </button>
 
             <button
               v-if="authStore.isAdmin"
               type="button"
-              class="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700"
+              :disabled="processingAction !== null"
+              class="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
               @click="router.push(`/externalApi/${externalApi.externalApiId}/edit`)"
             >
               수정
@@ -217,15 +258,26 @@ onMounted(() => {
             <button
               v-if="authStore.isAdmin"
               type="button"
-              class="rounded-md px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50"
+              :disabled="processingAction !== null"
+              class="rounded-md px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
               @click="deleteApi"
             >
-              삭제
+              <span class="inline-flex items-center gap-2">
+                <!-- 삭제 요청 중 로딩 표시 -->
+                <span
+                  v-if="processingAction === 'delete'"
+                  class="h-4 w-4 animate-spin rounded-full border-2 border-red-200 border-t-red-600"
+                  aria-hidden="true"
+                ></span>
+
+                {{ processingAction === 'delete' ? '삭제 중...' : '삭제' }}
+              </span>
             </button>
 
             <button
               type="button"
-              class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              :disabled="processingAction !== null"
+              class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
               @click="router.push('/externalApi')"
             >
               목록
