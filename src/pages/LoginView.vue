@@ -11,9 +11,16 @@ const username = ref('')
 const password = ref('')
 const err = ref('')
 const signupEnabled = ref(false)
+const isLoggingIn = ref(false)
 
 const login = async () => {
+  // 로그인 요청이 진행 중이면 중복 요청을 방지한다.
+  if (isLoggingIn.value) {
+    return
+  }
+
   err.value = ''
+  isLoggingIn.value = true
 
   try {
     // 서버 로그인 후 현재 사용자 정보를 Pinia에 저장한다.
@@ -24,6 +31,9 @@ const login = async () => {
     await router.replace(redirect)
   } catch {
     err.value = '로그인 실패'
+  } finally {
+    // 로그인 처리 완료 후 버튼을 다시 활성화한다.
+    isLoggingIn.value = false
   }
 }
 
@@ -94,9 +104,20 @@ onMounted(async () => {
 
           <button
             type="submit"
-            class="w-full rounded-md bg-gray-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-700"
+            :disabled="isLoggingIn"
+            :aria-busy="isLoggingIn"
+            class="w-full rounded-md bg-gray-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            로그인
+            <span class="inline-flex items-center gap-2">
+              <!-- 로그인 요청 중 로딩 표시 -->
+              <span
+                v-if="isLoggingIn"
+                class="h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-white"
+                aria-hidden="true"
+              ></span>
+
+              {{ isLoggingIn ? '로그인 중...' : '로그인' }}
+            </span>
           </button>
 
           <button
