@@ -649,10 +649,10 @@ onUnmounted(() => {
 
                   <div
                     v-else-if="detailList.length > 0"
-                    class="overflow-x-auto rounded-md border border-gray-200"
+                    class="max-h-[480px] overflow-auto rounded-md border border-gray-200"
                   >
                     <table class="w-full text-sm">
-                      <thead class="border-b border-gray-200 bg-gray-50">
+                      <thead class="sticky top-0 z-10 border-b border-gray-200 bg-gray-50">
                         <tr>
                           <th class="px-3 py-2 text-center text-xs font-semibold text-gray-500">
                             요청순번
