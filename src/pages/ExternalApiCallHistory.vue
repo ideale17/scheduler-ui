@@ -6,10 +6,15 @@ import {
   getExternalApiCallHistoryDetail,
   getExternalApiCallAttemptDetail,
 } from '@/api/externalApiCallHistoryApi'
+import { restartExternalApi } from '@/api/externalApi'
+import { useToastStore } from '@/stores/toastStore'
 
 // 화면 상태
 const route = useRoute()
 const router = useRouter()
+
+const toastStore = useToastStore()
+const restartingExecutionId = ref(null)
 
 const historyList = ref([])
 const selectedHistoryId = ref(null)
@@ -228,6 +233,41 @@ const fetchCallHistoryList = async () => {
     if (currentRequestId === listRequestId) {
       isLoading.value = false
     }
+  }
+}
+
+const restartHistory = async (history) => {
+  if (history.status !== 'FAILED' || !history.executionId || restartingExecutionId.value) {
+    return
+  }
+
+  const apiName = history.apiName || `API #${history.externalApiId}`
+
+  if (
+    !confirm(
+      `${apiName}을(를) 최초 실행 설정으로 처음부터 다시 실행하시겠습니까?\n` +
+        '이미 성공한 요청도 다시 호출되며, 인증은 현재 설정을 사용합니다.',
+    )
+  ) {
+    return
+  }
+
+  restartingExecutionId.value = history.executionId
+
+  try {
+    await restartExternalApi(history.executionId)
+    toastStore.success('API 재실행 완료', `${apiName} 재실행이 완료되었습니다.`)
+  } catch (error) {
+    const responseMessage = error.response?.data
+    const message =
+      typeof responseMessage === 'string' && responseMessage.trim()
+        ? responseMessage
+        : 'API 재실행 중 오류가 발생했습니다.'
+
+    toastStore.error('API 재실행 실패', message)
+  } finally {
+    await fetchCallHistoryList()
+    restartingExecutionId.value = null
   }
 }
 
@@ -630,14 +670,30 @@ onUnmounted(() => {
             <tr v-if="selectedHistoryId === history.executionId">
               <td colspan="9" class="bg-gray-50 p-4">
                 <div
-                  v-if="history.status === 'FAILED' && history.errorMessage"
-                  class="mb-4 rounded-md border border-red-200 bg-red-50 p-3"
+                  v-if="history.status === 'FAILED'"
+                  class="mb-4 flex flex-wrap items-start justify-between gap-3 rounded-md border border-red-200 bg-red-50 p-3"
                 >
-                  <div class="mb-1 text-sm font-semibold text-red-700">실행 실패 사유</div>
+                  <div class="min-w-0 flex-1">
+                    <div class="mb-1 text-sm font-semibold text-red-700">실행 실패 사유</div>
 
-                  <div class="break-all text-sm text-red-700">
-                    {{ history.errorMessage }}
+                    <div class="break-all text-sm text-red-700">
+                      {{ history.errorMessage || '기록된 실패 사유가 없습니다.' }}
+                    </div>
                   </div>
+
+                  <button
+                    v-if="history.executionId"
+                    type="button"
+                    :disabled="restartingExecutionId !== null"
+                    class="shrink-0 rounded-md border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    @click="restartHistory(history)"
+                  >
+                    {{
+                      restartingExecutionId === history.executionId
+                        ? '재실행 중…'
+                        : '처음부터 재실행'
+                    }}
+                  </button>
                 </div>
 
                 <div class="rounded-lg border border-gray-200 bg-white p-4">

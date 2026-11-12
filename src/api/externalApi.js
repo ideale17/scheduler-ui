@@ -96,3 +96,9 @@ export const deleteExternalApiPaging = (externalApiId) => {
     },
   })
 }
+
+export const restartExternalApi = (executionId) => {
+  return http.post('/external-api/restart', null, {
+    params: { executionId },
+  })
+}
