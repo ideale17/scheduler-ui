@@ -32,3 +32,9 @@ export const createTransformRule = (requestData) => {
 export const previewTransformRule = (requestData) => {
   return http.post('/transform-rule/preview', requestData)
 }
+
+export const updateTransformRule = (transformRuleId, requestData) => {
+  return http.put('/transform-rule/update', requestData, {
+    params: { transformRuleId },
+  })
+}

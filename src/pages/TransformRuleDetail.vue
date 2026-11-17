@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/authStore'
 import {
   getTransformRuleDetail,
   getTransformRuleVersionList,
@@ -9,6 +10,8 @@ import {
 
 const route = useRoute()
 const router = useRouter()
+
+const authStore = useAuthStore()
 
 const detail = ref(null)
 const versions = ref([])
@@ -130,6 +133,15 @@ onMounted(() => {
   <div class="space-y-4">
     <!-- 상단 작업 영역 -->
     <div class="flex justify-end gap-2">
+      <button
+        v-if="authStore.isAdmin && detail"
+        type="button"
+        class="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+        @click="router.push(`/transform-rule/${getRuleId()}/edit`)"
+      >
+        수정
+      </button>
+
       <button
         type="button"
         class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
@@ -253,15 +265,15 @@ onMounted(() => {
       </section>
 
       <!-- 추출 필드 -->
-      <section class="overflow-hidden rounded-lg border border-gray-200 bg-white">
-        <div class="border-b border-gray-200 px-5 py-4">
+      <section class="rounded-lg border border-gray-200 bg-white p-5">
+        <div class="mb-4">
           <h3 class="text-base font-semibold text-gray-900">추출 필드</h3>
           <p class="mt-1 text-sm text-gray-500">
             선택한 버전의 추출 필드 {{ detail.fields?.length ?? 0 }}개
           </p>
         </div>
 
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto rounded-md border border-gray-200">
           <table class="w-full text-sm">
             <thead class="border-b border-gray-200 bg-gray-50">
               <tr>
