@@ -44,6 +44,11 @@ const menuGroups = [
         label: '적재 모델 관리',
         match: 'analysisModel',
       },
+      {
+        to: '/analysis-load',
+        label: '적재 대상 관리',
+        match: 'analysisLoad',
+      },
     ],
   },
   {
@@ -90,6 +95,9 @@ const isActive = (menu) => {
 
     case 'analysisModel':
       return route.path === '/analysis-model' || route.path.startsWith('/analysis-model/')
+
+    case 'analysisLoad':
+      return route.path === '/analysis-load'
 
     case 'aiAnalysis':
       return route.path === '/ai-analysis'
