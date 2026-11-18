@@ -24,6 +24,10 @@ import TransformRuleEdit from '@/pages/TransformRuleEdit.vue'
 import TransformTaskList from '@/pages/TransformTaskList.vue'
 import TransformResultList from '@/pages/TransformResultList.vue'
 import TransformResultDetail from '@/pages/TransformResultDetail.vue'
+import AnalysisModelList from '@/pages/AnalysisModelList.vue'
+import AnalysisModelDetail from '@/pages/AnalysisModelDetail.vue'
+import AnalysisModelAdd from '@/pages/AnalysisModelAdd.vue'
+import AnalysisModelEdit from '@/pages/AnalysisModelEdit.vue'
 import AiAnalysis from '@/pages/AiAnalysis.vue'
 
 const routes = [
@@ -168,6 +172,40 @@ const routes = [
         meta: {
           title: '가공 결과 상세',
           requiresAuth: true,
+        },
+      },
+      {
+        path: 'analysis-model',
+        component: AnalysisModelList,
+        meta: {
+          title: '데이터 적재 모델 관리',
+          requiresAuth: true,
+        },
+      },
+      {
+        path: 'analysis-model/:analysisModelId',
+        component: AnalysisModelDetail,
+        meta: {
+          title: '데이터 적재 모델 상세',
+          requiresAuth: true,
+        },
+      },
+      {
+        path: 'analysis-model/add',
+        component: AnalysisModelAdd,
+        meta: {
+          title: '데이터 적재 모델 등록',
+          requiresAuth: true,
+          requiresAdmin: true,
+        },
+      },
+      {
+        path: 'analysis-model/:analysisModelId/edit',
+        component: AnalysisModelEdit,
+        meta: {
+          title: '데이터 적재 모델 수정',
+          requiresAuth: true,
+          requiresAdmin: true,
         },
       },
       {

@@ -21,19 +21,29 @@ const menuGroups = [
     ],
   },
   {
-    label: 'API MANAGEMENT',
+    label: 'DATA COLLECTION',
     menus: [
       { to: '/externalApi', label: 'API 관리', match: 'externalApi' },
       { to: '/externalApi/history', label: 'API 실행 이력', match: 'externalApiHistory' },
+      { to: '/raw-data', label: 'Raw Data 관리', match: 'rawData' },
     ],
   },
   {
-    label: 'DATA PROCESSING',
+    label: 'DATA TRANSFORMATION',
     menus: [
-      { to: '/raw-data', label: 'Raw Data 관리', match: 'rawData' },
       { to: '/transform-rule', label: '가공 규칙 관리', match: 'transformRule' },
       { to: '/transform-task', label: '가공 대상 관리', match: 'transformTask' },
       { to: '/transform-result', label: '가공 결과', match: 'transformResult' },
+    ],
+  },
+  {
+    label: 'DATA LOADING',
+    menus: [
+      {
+        to: '/analysis-model',
+        label: '적재 모델 관리',
+        match: 'analysisModel',
+      },
     ],
   },
   {
@@ -77,6 +87,9 @@ const isActive = (menu) => {
 
     case 'transformResult':
       return route.path === '/transform-result' || route.path.startsWith('/transform-result/')
+
+    case 'analysisModel':
+      return route.path === '/analysis-model' || route.path.startsWith('/analysis-model/')
 
     case 'aiAnalysis':
       return route.path === '/ai-analysis'
