@@ -655,7 +655,7 @@ watch(
         class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
         @click="addTransformRule"
       >
-        {{ isSaving ? '등록 중...' : '규칙 등록' }}
+        {{ isSaving ? '등록 중...' : '등록' }}
       </button>
     </div>
   </div>
