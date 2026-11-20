@@ -10,6 +10,7 @@ import { parseXmlTree } from '@/utils/xmlUtils'
 const router = useRouter()
 
 const isSaving = ref(false)
+const isPreviewing = ref(false)
 const errorMessage = ref('')
 const sampleError = ref('')
 const sampleValidated = ref(false)
@@ -30,11 +31,16 @@ const fields = ref([])
 const previewResult = ref(null)
 const previewError = ref('')
 const isPreviewed = ref(false)
-const isPreviewing = ref(false)
 let previewRequestId = 0
 
 const inputClass =
   'w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-gray-500'
+
+const transformTypeOptions = [
+  { value: 'DIRECT', label: 'DIRECT - 단일 필드 추출' },
+  { value: 'CONCAT', label: 'CONCAT - 문자열 결합' },
+  { value: 'DATE_COMBINE', label: 'DATE_COMBINE - 날짜 결합' },
+]
 
 const parsedSample = computed(() => {
   if (!sampleData.value.trim()) {
@@ -80,9 +86,12 @@ const validateSample = () => {
   return parsedSample.value.valid
 }
 
+// 추출 필드 추가
 const addField = () => {
   fields.value.push({
-    sourcePath: '',
+    sourcePaths: [''],
+    transformType: 'DIRECT',
+    separator: '',
     targetName: '',
     dataType: 'STRING',
     valueFormat: '',
@@ -90,13 +99,71 @@ const addField = () => {
   })
 }
 
+// 추출 필드 삭제
 const removeField = (index) => {
   fields.value.splice(index, 1)
 }
 
+// 가공 방식에 따라 원본 경로 개수와 출력 데이터 타입을 설정한다.
+const changeTransformType = (field) => {
+  // 1. 기존 첫 번째 원본 경로는 유지한다.
+  const firstPath = field.sourcePaths[0] ?? ''
+
+  // 2. 가공 방식별 필수 원본 경로를 설정한다.
+  if (field.transformType === 'DATE_COMBINE') {
+    field.sourcePaths = [firstPath, '', '']
+    field.dataType = 'STRING'
+  } else if (field.transformType === 'CONCAT') {
+    field.sourcePaths = [firstPath, '']
+    field.dataType = 'STRING'
+  } else {
+    field.sourcePaths = [firstPath]
+  }
+
+  // 3. 이전 가공 방식의 변환 옵션을 초기화한다.
+  field.separator = ''
+  field.valueFormat = ''
+}
+
+// CONCAT 원본 경로 추가
+const addSourcePath = (field) => {
+  if (field.transformType !== 'CONCAT') {
+    return
+  }
+
+  field.sourcePaths.push('')
+}
+
+// CONCAT 원본 경로 삭제
+const removeSourcePath = (field, index) => {
+  if (field.transformType !== 'CONCAT' || field.sourcePaths.length <= 2) {
+    return
+  }
+
+  field.sourcePaths.splice(index, 1)
+}
+
+// 필드 입력값을 API 요청 구조로 변환한다.
+const buildFields = () =>
+  fields.value.map((field, index) => ({
+    sourcePaths: field.sourcePaths.map((path) => path.trim()),
+    transformType: field.transformType,
+    separator: field.transformType === 'CONCAT' ? field.separator : null,
+    targetName: field.targetName.trim(),
+    dataType: field.dataType,
+    valueFormat:
+      field.transformType === 'DIRECT' && field.dataType === 'DATETIME'
+        ? field.valueFormat.trim() || null
+        : null,
+    requiredYn: field.requiredYn,
+    sortOrder: index,
+  }))
+
+// 입력값 검증
 const validateForm = () => {
   errorMessage.value = ''
 
+  // 1. 가공 규칙 기본 정보를 검증한다.
   if (!rule.value.ruleName.trim()) {
     errorMessage.value = '가공 규칙명을 입력해주세요.'
     return false
@@ -117,11 +184,13 @@ const validateForm = () => {
     return false
   }
 
+  // 2. 샘플 데이터 형식을 검증한다.
   if (!validateSample()) {
     errorMessage.value = '샘플 데이터 형식을 확인해주세요.'
     return false
   }
 
+  // 3. 추출 필드 존재 여부를 확인한다.
   if (fields.value.length === 0) {
     errorMessage.value = '추출 필드를 최소 1개 이상 추가해주세요.'
     return false
@@ -129,17 +198,18 @@ const validateForm = () => {
 
   const targetNames = new Set()
 
+  // 4. 추출 필드별 원본 경로와 가공 설정을 검증한다.
   for (const field of fields.value) {
-    const sourcePath = field.sourcePath.trim()
     const targetName = field.targetName.trim()
+    const sourcePaths = field.sourcePaths.map((path) => path.trim())
 
-    if (!sourcePath || !targetName) {
-      errorMessage.value = '모든 추출 필드의 원본 경로와 출력 필드명을 입력해주세요.'
+    if (!targetName || sourcePaths.some((path) => !path)) {
+      errorMessage.value = '모든 원본 경로와 출력 필드명을 입력해주세요.'
       return false
     }
 
-    if (sourcePath.length > 1000 || targetName.length > 100) {
-      errorMessage.value = '추출 필드 경로 또는 출력 필드명의 길이가 제한을 초과했습니다.'
+    if (targetName.length > 100 || sourcePaths.some((path) => path.length > 1000)) {
+      errorMessage.value = '원본 경로 또는 출력 필드명의 길이가 제한을 초과했습니다.'
       return false
     }
 
@@ -150,8 +220,36 @@ const validateForm = () => {
 
     targetNames.add(targetName)
 
-    // 날짜 타입은 원본 날짜 형식을 반드시 선택한다.
-    if (field.dataType === 'DATETIME' && !field.valueFormat.trim()) {
+    if (field.transformType === 'DIRECT') {
+      if (sourcePaths.length !== 1) {
+        errorMessage.value = `DIRECT는 원본 경로 1개가 필요합니다: ${targetName}`
+        return false
+      }
+    } else if (field.transformType === 'CONCAT') {
+      if (sourcePaths.length < 2 || field.dataType !== 'STRING') {
+        errorMessage.value = `CONCAT은 문자열 원본 경로 2개 이상이 필요합니다: ${targetName}`
+        return false
+      }
+
+      if (field.separator == null || field.separator.length > 20) {
+        errorMessage.value = 'CONCAT 구분자는 20자 이하여야 합니다.'
+        return false
+      }
+    } else if (field.transformType === 'DATE_COMBINE') {
+      if (sourcePaths.length !== 3 || field.dataType !== 'STRING') {
+        errorMessage.value = `DATE_COMBINE은 연, 월, 일 경로 3개가 필요합니다: ${targetName}`
+        return false
+      }
+    } else {
+      errorMessage.value = `지원하지 않는 가공 방식입니다: ${targetName}`
+      return false
+    }
+
+    if (
+      field.transformType === 'DIRECT' &&
+      field.dataType === 'DATETIME' &&
+      !field.valueFormat.trim()
+    ) {
       errorMessage.value = `날짜 입력 형식을 선택해주세요: ${targetName}`
       return false
     }
@@ -165,7 +263,7 @@ const validateForm = () => {
   return true
 }
 
-// JSON 가공 결과 미리보기
+// JSON/XML 가공 결과 미리보기
 const previewTransformRule = async () => {
   if (isSaving.value || isPreviewing.value) {
     return
@@ -187,14 +285,7 @@ const previewTransformRule = async () => {
       dataFormat: version.value.dataFormat,
       repeatPath: version.value.repeatPath.trim() || null,
     },
-    fields: fields.value.map((field, index) => ({
-      sourcePath: field.sourcePath.trim(),
-      targetName: field.targetName.trim(),
-      dataType: field.dataType,
-      valueFormat: field.dataType === 'DATETIME' ? field.valueFormat.trim() || null : null,
-      requiredYn: field.requiredYn,
-      sortOrder: index,
-    })),
+    fields: buildFields(),
   }
 
   const requestId = ++previewRequestId
@@ -227,6 +318,7 @@ const previewTransformRule = async () => {
   }
 }
 
+// 가공 규칙 등록
 const addTransformRule = async () => {
   // 1. 중복 등록 및 입력값을 검증한다.
   if (isSaving.value || !validateForm()) {
@@ -249,20 +341,14 @@ const addTransformRule = async () => {
       dataFormat: version.value.dataFormat,
       repeatPath: version.value.repeatPath.trim() || null,
     },
-    fields: fields.value.map((field, index) => ({
-      sourcePath: field.sourcePath.trim(),
-      targetName: field.targetName.trim(),
-      dataType: field.dataType,
-      valueFormat: field.dataType === 'DATETIME' ? field.valueFormat.trim() || null : null,
-      requiredYn: field.requiredYn,
-      sortOrder: index,
-    })),
+    fields: buildFields(),
   }
 
   isSaving.value = true
   errorMessage.value = ''
 
   try {
+    // 4. 가공 규칙을 등록한다.
     await createTransformRule(requestData)
 
     alert('가공 규칙이 등록되었습니다.')
@@ -307,7 +393,7 @@ watch(
             v-model="rule.ruleName"
             type="text"
             maxlength="100"
-            placeholder="예: USGS 지진 데이터 가공"
+            placeholder="예: 부동산 매매 거래 데이터 가공"
             :class="inputClass"
           />
         </div>
@@ -389,7 +475,7 @@ watch(
     <section class="rounded-lg border border-gray-200 bg-white p-5">
       <h3 class="mb-4 text-base font-semibold text-gray-900">반복 대상</h3>
 
-      <label class="mb-1 block text-sm font-medium text-gray-700"> 반복 경로 </label>
+      <label class="mb-1 block text-sm font-medium text-gray-700">반복 경로</label>
 
       <input
         v-model="version.repeatPath"
@@ -402,8 +488,8 @@ watch(
       />
 
       <p class="mt-2 text-xs text-gray-500">
-        반복 경로는 선택 사항입니다. 지정하지 않으면 최상위 객체는 1건, 최상위 배열은 요소별로
-        가공합니다. 반복 경로를 지정하는 경우 JSON 배열을 가리켜야 합니다.
+        반복 경로는 선택 사항입니다. 지정하지 않으면 최상위 객체 또는 배열을 가공합니다. XML에서는
+        반복 요소의 경로를 지정할 수 있습니다.
       </p>
     </section>
 
@@ -452,35 +538,124 @@ watch(
           </div>
 
           <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <!-- 가공 방식 -->
             <div>
               <label class="mb-1 block text-sm font-medium text-gray-700">
-                원본 경로 <span class="text-red-500">*</span>
+                가공 방식 <span class="text-red-500">*</span>
               </label>
-              <input
-                v-model="field.sourcePath"
-                type="text"
-                maxlength="1000"
-                placeholder="예: properties.mag"
+
+              <select
+                v-model="field.transformType"
                 :class="inputClass"
-              />
+                @change="changeTransformType(field)"
+              >
+                <option
+                  v-for="option in transformTypeOptions"
+                  :key="option.value"
+                  :value="option.value"
+                >
+                  {{ option.label }}
+                </option>
+              </select>
             </div>
 
+            <!-- 출력 필드명 -->
             <div>
               <label class="mb-1 block text-sm font-medium text-gray-700">
                 출력 필드명 <span class="text-red-500">*</span>
               </label>
+
               <input
                 v-model="field.targetName"
                 type="text"
                 maxlength="100"
-                placeholder="예: magnitude"
+                placeholder="예: contractDate"
                 :class="inputClass"
               />
             </div>
 
+            <!-- 원본 경로 목록 -->
+            <div class="md:col-span-2">
+              <label class="mb-1 block text-sm font-medium text-gray-700">
+                원본 경로 <span class="text-red-500">*</span>
+              </label>
+
+              <div class="space-y-2">
+                <div
+                  v-for="(sourcePath, pathIndex) in field.sourcePaths"
+                  :key="pathIndex"
+                  class="flex items-center gap-2"
+                >
+                  <span
+                    v-if="field.transformType === 'DATE_COMBINE'"
+                    class="w-10 shrink-0 text-sm text-gray-600"
+                  >
+                    {{ ['연도', '월', '일'][pathIndex] }}
+                  </span>
+
+                  <input
+                    v-model="field.sourcePaths[pathIndex]"
+                    type="text"
+                    maxlength="1000"
+                    :placeholder="
+                      field.transformType === 'DATE_COMBINE'
+                        ? ['dealYear', 'dealMonth', 'dealDay'][pathIndex]
+                        : '예: properties.mag'
+                    "
+                    :class="inputClass"
+                  />
+
+                  <button
+                    v-if="field.transformType === 'CONCAT' && field.sourcePaths.length > 2"
+                    type="button"
+                    class="shrink-0 text-sm font-medium text-red-600 hover:text-red-700"
+                    @click="removeSourcePath(field, pathIndex)"
+                  >
+                    삭제
+                  </button>
+                </div>
+              </div>
+
+              <button
+                v-if="field.transformType === 'CONCAT'"
+                type="button"
+                class="mt-2 text-sm font-medium text-gray-700 hover:text-gray-900"
+                @click="addSourcePath(field)"
+              >
+                + 원본 경로 추가
+              </button>
+
+              <p v-if="field.transformType === 'DATE_COMBINE'" class="mt-2 text-xs text-gray-500">
+                연도, 월, 일 순서로 입력합니다. 결과는 YYYY-MM-DD 형식입니다.
+              </p>
+            </div>
+
+            <!-- 결합 구분자 -->
+            <div v-if="field.transformType === 'CONCAT'" class="md:col-span-2">
+              <label class="mb-1 block text-sm font-medium text-gray-700"> 결합 구분자 </label>
+
+              <input
+                v-model="field.separator"
+                type="text"
+                maxlength="20"
+                placeholder="예: 공백 또는 -"
+                :class="inputClass"
+              />
+
+              <p class="mt-1 text-xs text-gray-500">
+                빈 값이면 구분자 없이 결합합니다. 공백 구분자를 사용하려면 공백 한 칸을 입력합니다.
+              </p>
+            </div>
+
+            <!-- 데이터 타입 -->
             <div>
               <label class="mb-1 block text-sm font-medium text-gray-700"> 데이터 타입 </label>
-              <select v-model="field.dataType" :class="inputClass">
+
+              <select
+                v-model="field.dataType"
+                :disabled="field.transformType !== 'DIRECT'"
+                :class="inputClass"
+              >
                 <option value="STRING">STRING</option>
                 <option value="INTEGER">INTEGER</option>
                 <option value="DECIMAL">DECIMAL</option>
@@ -489,16 +664,21 @@ watch(
               </select>
             </div>
 
+            <!-- 필수 여부 -->
             <div>
               <label class="mb-1 block text-sm font-medium text-gray-700"> 필수 여부 </label>
+
               <select v-model="field.requiredYn" :class="inputClass">
                 <option value="N">선택</option>
                 <option value="Y">필수</option>
               </select>
             </div>
 
-            <!-- 날짜 입력 형식 -->
-            <div v-if="field.dataType === 'DATETIME'" class="md:col-span-2">
+            <!-- 기존 날짜 입력 형식 -->
+            <div
+              v-if="field.transformType === 'DIRECT' && field.dataType === 'DATETIME'"
+              class="md:col-span-2"
+            >
               <label class="mb-1 block text-sm font-medium text-gray-700"> 원본 날짜 형식 </label>
 
               <select v-model="field.valueFormat" :class="inputClass">
@@ -508,10 +688,10 @@ watch(
               </select>
 
               <p class="mt-1 text-xs text-gray-500">
-                외부 API에서 전달하는 원본 날짜 값의 형식을 선택합니다.
+                외부 API에서 전달하는 날짜 값의 형식을 선택합니다.
               </p>
 
-              <!-- ISO 8601 날짜 변환 예시 -->
+              <!-- ISO 8601 변환 예시 -->
               <div
                 v-if="field.valueFormat === 'ISO_DATETIME'"
                 class="mt-3 rounded-md border border-gray-200 bg-white p-3"
@@ -529,11 +709,6 @@ watch(
                     <p class="break-all font-mono text-gray-900">2026-10-24T03:30:00Z</p>
                   </div>
                 </div>
-
-                <p class="mt-3 text-xs text-gray-500">
-                  날짜와 시간 사이의 T는 구분 문자이며, +09:00은 한국 시간대를 의미합니다. UTC
-                  기준으로 변환하여 저장합니다.
-                </p>
               </div>
 
               <!-- Unix 타임스탬프 변환 예시 -->
@@ -554,16 +729,10 @@ watch(
                     <p class="break-all font-mono text-gray-900">2026-10-24T03:30:00Z</p>
                   </div>
                 </div>
-
-                <p class="mt-3 text-xs text-gray-500">
-                  1970년 1월 1일 00:00:00(UTC)부터 경과한 시간을 밀리초 단위로 표현한 숫자입니다.
-                  UTC 날짜·시간으로 변환하여 저장합니다.
-                </p>
               </div>
 
               <p class="mt-2 text-xs text-gray-500">
-                가공 결과는 UTC 기준 ISO 8601 문자열로 저장됩니다. 시간대 정보가 없는 ISO
-                날짜·시간은 변환할 수 없습니다.
+                시간대 정보가 없는 ISO 날짜·시간은 변환할 수 없습니다.
               </p>
             </div>
           </div>
@@ -576,9 +745,8 @@ watch(
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 class="text-base font-semibold text-gray-900">가공 결과 미리보기</h3>
-
           <p class="mt-1 text-xs text-gray-500">
-            샘플 JSON/XML에 추출 경로와 데이터 타입 설정을 적용합니다.
+            샘플 JSON/XML에 추출 경로 및 결합 설정을 적용합니다.
           </p>
         </div>
 
@@ -592,7 +760,6 @@ watch(
         </button>
       </div>
 
-      <!-- 미리보기 오류 -->
       <div
         v-if="previewError"
         class="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700"
@@ -600,7 +767,6 @@ watch(
         {{ previewError }}
       </div>
 
-      <!-- 가공 결과 -->
       <div v-if="isPreviewed">
         <div class="mb-3 flex items-center justify-between">
           <span class="text-sm font-medium text-green-700"> 가공이 완료되었습니다. </span>
@@ -616,7 +782,6 @@ watch(
         >
       </div>
 
-      <!-- 실행 전 -->
       <div
         v-else-if="!previewError"
         class="rounded-md border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500"
@@ -627,8 +792,8 @@ watch(
 
     <!-- 안내 -->
     <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
-      현재는 가공 규칙 설정만 저장합니다. JSON 샘플 데이터의 가공 결과는 미리보기에서 확인할 수
-      있으며, 실제 Raw Data 가공 및 저장은 추후 지원합니다.
+      가공 규칙의 설정만 저장합니다. 샘플 데이터는 미리보기에만 사용되며, 실제 Raw Data의 가공 및
+      결과 저장은 가공 작업을 통해 처리합니다.
     </div>
 
     <!-- 오류 메시지 -->

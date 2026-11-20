@@ -117,6 +117,17 @@ const getEnabledClass = (enabled) => {
   return enabled === 'Y' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
 }
 
+const getTransformTypeLabel = (transformType) => {
+  switch (transformType) {
+    case 'CONCAT':
+      return '문자열 결합'
+    case 'DATE_COMBINE':
+      return '날짜 결합'
+    default:
+      return '단일 필드'
+  }
+}
+
 watch(
   () => route.params.transformRuleId,
   () => {
@@ -172,6 +183,7 @@ onMounted(() => {
       <section class="rounded-lg border border-gray-200 bg-white p-5">
         <div class="mb-5 flex items-center justify-between">
           <h3 class="text-base font-semibold text-gray-900">기본 정보</h3>
+
           <span
             class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium"
             :class="getEnabledClass(detail.rule.enabled)"
@@ -226,6 +238,7 @@ onMounted(() => {
                 v{{ detail.version.versionNo }}
               </span>
             </h3>
+
             <p class="mt-1 text-sm text-gray-500">선택한 버전의 데이터 추출 설정을 확인합니다.</p>
           </div>
 
@@ -243,6 +256,7 @@ onMounted(() => {
         <div class="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
           <div>
             <div class="text-xs font-medium text-gray-500">데이터 형식</div>
+
             <div class="mt-1 text-sm font-medium text-gray-900">
               {{ detail.version.dataFormat }}
             </div>
@@ -250,6 +264,7 @@ onMounted(() => {
 
           <div>
             <div class="text-xs font-medium text-gray-500">반복 경로</div>
+
             <div class="mt-1 break-all font-mono text-sm text-gray-700">
               {{ detail.version.repeatPath || '-' }}
             </div>
@@ -257,6 +272,7 @@ onMounted(() => {
 
           <div>
             <div class="text-xs font-medium text-gray-500">버전 생성 일시</div>
+
             <div class="mt-1 text-sm text-gray-700">
               {{ formatDateTime(detail.version.createdAt) }}
             </div>
@@ -268,6 +284,7 @@ onMounted(() => {
       <section class="rounded-lg border border-gray-200 bg-white p-5">
         <div class="mb-4">
           <h3 class="text-base font-semibold text-gray-900">추출 필드</h3>
+
           <p class="mt-1 text-sm text-gray-500">
             선택한 버전의 추출 필드 {{ detail.fields?.length ?? 0 }}개
           </p>
@@ -278,6 +295,7 @@ onMounted(() => {
             <thead class="border-b border-gray-200 bg-gray-50">
               <tr>
                 <th class="px-4 py-3 text-center text-xs font-semibold text-gray-500">순서</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500">가공 방식</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500">원본 경로</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500">출력 필드명</th>
                 <th class="px-4 py-3 text-center text-xs font-semibold text-gray-500">타입</th>
@@ -291,25 +309,65 @@ onMounted(() => {
                 <td class="px-4 py-3 text-center text-gray-600">
                   {{ field.sortOrder + 1 }}
                 </td>
-                <td class="px-4 py-3 font-mono text-gray-700">
-                  {{ field.sourcePath }}
+
+                <!-- 가공 방식 -->
+                <td class="px-4 py-3 text-gray-700">
+                  <div class="font-medium">
+                    {{ field.transformType ?? 'DIRECT' }}
+                  </div>
+
+                  <div class="mt-1 text-xs text-gray-500">
+                    {{ getTransformTypeLabel(field.transformType) }}
+                  </div>
                 </td>
+
+                <!-- 원본 경로 목록 -->
+                <td class="px-4 py-3 font-mono text-gray-700">
+                  <div class="space-y-1">
+                    <div
+                      v-for="(path, pathIndex) in field.sourcePaths ?? []"
+                      :key="pathIndex"
+                      class="break-all"
+                    >
+                      <span
+                        v-if="field.transformType === 'DATE_COMBINE'"
+                        class="mr-2 font-sans text-gray-500"
+                      >
+                        {{ ['연도', '월', '일'][pathIndex] }}:
+                      </span>
+
+                      {{ path }}
+                    </div>
+                  </div>
+
+                  <p
+                    v-if="field.transformType === 'CONCAT'"
+                    class="mt-2 font-sans text-xs text-gray-500"
+                  >
+                    구분자:
+                    {{ field.separator === '' ? '(없음)' : (field.separator ?? '(없음)') }}
+                  </p>
+                </td>
+
                 <td class="px-4 py-3 font-medium text-gray-900">
                   {{ field.targetName }}
                 </td>
+
                 <td class="px-4 py-3 text-center text-gray-700">
                   {{ field.dataType }}
                 </td>
+
                 <td class="px-4 py-3 text-center text-gray-700">
                   {{ field.requiredYn === 'Y' ? '필수' : '선택' }}
                 </td>
+
                 <td class="px-4 py-3 text-center text-gray-600">
                   {{ field.valueFormat || '-' }}
                 </td>
               </tr>
 
               <tr v-if="!detail.fields?.length">
-                <td colspan="6" class="px-4 py-8 text-center text-gray-500">
+                <td colspan="7" class="px-4 py-8 text-center text-gray-500">
                   추출 필드가 없습니다.
                 </td>
               </tr>
@@ -322,6 +380,7 @@ onMounted(() => {
       <section class="rounded-lg border border-gray-200 bg-white p-5">
         <div class="mb-4">
           <h3 class="text-base font-semibold text-gray-900">버전 이력</h3>
+
           <p class="mt-1 text-sm text-gray-500">
             버전을 선택하면 당시의 가공 설정과 추출 필드를 확인할 수 있습니다.
           </p>
@@ -350,6 +409,7 @@ onMounted(() => {
               <tr v-for="version in versions" :key="version.transformRuleVersionId">
                 <td class="px-4 py-3 text-center font-medium text-gray-900">
                   v{{ version.versionNo }}
+
                   <span
                     v-if="version.versionNo === detail.rule.currentVersion"
                     class="ml-1 text-xs font-normal text-green-700"
@@ -357,15 +417,19 @@ onMounted(() => {
                     (현재)
                   </span>
                 </td>
+
                 <td class="px-4 py-3 text-center text-gray-600">
                   {{ version.dataFormat }}
                 </td>
+
                 <td class="px-4 py-3 font-mono text-gray-600">
                   {{ version.repeatPath || '-' }}
                 </td>
+
                 <td class="px-4 py-3 text-center text-gray-600">
                   {{ formatDateTime(version.createdAt) }}
                 </td>
+
                 <td class="px-4 py-3 text-center">
                   <button
                     type="button"
