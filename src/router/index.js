@@ -29,6 +29,7 @@ import AnalysisModelDetail from '@/pages/AnalysisModelDetail.vue'
 import AnalysisModelAdd from '@/pages/AnalysisModelAdd.vue'
 import AnalysisModelEdit from '@/pages/AnalysisModelEdit.vue'
 import AnalysisLoadList from '@/pages/AnalysisLoadList.vue'
+import AnalysisLoadResultList from '@/pages/AnalysisLoadResultList.vue'
 import AiAnalysis from '@/pages/AiAnalysis.vue'
 
 const routes = [
@@ -214,6 +215,14 @@ const routes = [
         component: AnalysisLoadList,
         meta: {
           title: '적재 대상 관리',
+          requiresAuth: true,
+        },
+      },
+      {
+        path: 'analysis-load/results',
+        component: AnalysisLoadResultList,
+        meta: {
+          title: '적재 데이터 조회',
           requiresAuth: true,
         },
       },

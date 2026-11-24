@@ -11,3 +11,10 @@ export const getAnalysisLoadList = (searchParams) => {
 export const createAnalysisLoadSources = (requestData) => {
   return http.post('/analysis-load/add', requestData)
 }
+
+// 적재 대상 테이블에 저장된 실제 데이터 조회
+export const getAnalysisLoadResults = (searchParams) => {
+  return http.get('/analysis-load/results', {
+    params: searchParams,
+  })
+}

@@ -49,6 +49,11 @@ const menuGroups = [
         label: '적재 대상 관리',
         match: 'analysisLoad',
       },
+      {
+        to: '/analysis-load/results',
+        label: '적재 데이터 조회',
+        match: 'analysisLoadResult',
+      },
     ],
   },
   {
@@ -98,6 +103,9 @@ const isActive = (menu) => {
 
     case 'analysisLoad':
       return route.path === '/analysis-load'
+
+    case 'analysisLoadResult':
+      return route.path === '/analysis-load/results'
 
     case 'aiAnalysis':
       return route.path === '/ai-analysis'
