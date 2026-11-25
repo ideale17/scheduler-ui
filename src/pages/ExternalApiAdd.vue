@@ -3,6 +3,7 @@ import { computed, nextTick, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useToastStore } from '@/stores/toastStore'
 import { createExternalApi } from '@/api/externalApi'
+import { MAX_COMBINATION_COUNT } from '@/utils/externalApiLimits'
 import { setFieldError } from '@/utils/formValidation'
 
 const router = useRouter()
@@ -641,8 +642,8 @@ const validateForm = () => {
   }
 
   // 10. 전체 반복 조합 수를 검증한다.
-  if (expectedCombinationCount.value > 100) {
-    alert('External API 반복 조합은 최대 100개까지 설정할 수 있습니다.')
+  if (expectedCombinationCount.value > MAX_COMBINATION_COUNT) {
+    alert(`External API 반복 조합은 최대 ${MAX_COMBINATION_COUNT}개까지 설정할 수 있습니다.`)
     return false
   }
 
@@ -1613,11 +1614,14 @@ watch(
             <div class="text-xl font-semibold text-gray-900">
               {{ expectedCombinationCount.toLocaleString() }}개
             </div>
-            <p class="mt-1 text-xs text-gray-500">최대 100개</p>
+            <p class="mt-1 text-xs text-gray-500">최대 {{ MAX_COMBINATION_COUNT }}개</p>
           </div>
         </div>
 
-        <p v-if="expectedCombinationCount > 100" class="mt-2 text-xs text-red-600">
+        <p
+          v-if="expectedCombinationCount > MAX_COMBINATION_COUNT"
+          class="mt-2 text-xs text-red-600"
+        >
           허용된 조합 수를 초과했습니다. 반복 목록이나 기간을 줄여주세요.
         </p>
 

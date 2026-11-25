@@ -17,6 +17,7 @@ import {
   getTransformAutoConfigList,
   updateTransformAutoConfigs,
 } from '@/api/transformAutoConfigApi'
+import { MAX_COMBINATION_COUNT } from '@/utils/externalApiLimits'
 import { moveToField, setFieldError } from '@/utils/formValidation'
 
 const route = useRoute()
@@ -851,8 +852,8 @@ const validateParams = () => {
   }
 
   // 5. 전체 반복 조합 수를 제한한다.
-  if (expectedCombinationCount.value > 100) {
-    alert('전체 파라미터 조합은 최대 100개까지 생성할 수 있습니다.')
+  if (expectedCombinationCount.value > MAX_COMBINATION_COUNT) {
+    alert(`전체 파라미터 조합은 최대 ${MAX_COMBINATION_COUNT}개까지 생성할 수 있습니다.`)
     return false
   }
 
@@ -2141,11 +2142,13 @@ onMounted(() => {
           예상 반복 조합:
           <span
             class="font-semibold"
-            :class="expectedCombinationCount > 100 ? 'text-red-600' : 'text-gray-900'"
+            :class="
+              expectedCombinationCount > MAX_COMBINATION_COUNT ? 'text-red-600' : 'text-gray-900'
+            "
           >
             {{ expectedCombinationCount }}개
           </span>
-          <span class="ml-1 text-gray-500">(최대 100개)</span>
+          <span class="ml-1 text-gray-500">(최대 {{ MAX_COMBINATION_COUNT }}개)</span>
         </div>
 
         <!-- 파라미터 추가 및 저장 -->

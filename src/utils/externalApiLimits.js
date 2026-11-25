@@ -1,0 +1,1 @@
+export const MAX_COMBINATION_COUNT = 300
