@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { getExternalApiList } from '@/api/externalApi'
@@ -18,19 +18,24 @@ const rawDataList = ref([])
 const selectedExternalApiId = ref('')
 const selectedTransformRuleId = ref('')
 const selectedRawDataIds = ref([])
+const maxRawDataSelectionCount = 100
 
 const isExternalApiLoading = ref(false)
 const isTransformRuleLoading = ref(false)
 const isRawDataLoading = ref(false)
+const isLoadingMore = ref(false)
 const isRegistering = ref(false)
 
 const externalApiErrorMessage = ref('')
 const transformRuleErrorMessage = ref('')
 const rawDataErrorMessage = ref('')
+const loadMoreErrorMessage = ref('')
 
-const currentPage = ref(1)
+const currentPage = ref(0)
 const pageSize = 10
 const totalCount = ref(0)
+const rawDataScrollArea = ref(null)
+const rawDataLoadTrigger = ref(null)
 
 // API 변경 중 이전 요청 결과가 반영되지 않도록 관리한다.
 let rawDataRequestId = 0
@@ -44,14 +49,8 @@ const historyErrorMessage = ref('')
 // 이전 가공 이력 조회 응답을 무시하기 위한 식별자
 let historyRequestId = 0
 
-// 페이징 계산
-const totalPages = computed(() => {
-  if (totalCount.value === 0) {
-    return 1
-  }
-
-  return Math.ceil(totalCount.value / pageSize)
-})
+// 마지막으로 받은 페이지를 기준으로 추가 조회 가능 여부를 확인한다.
+const hasMoreRawData = computed(() => currentPage.value * pageSize < totalCount.value)
 
 // 현재 규칙 버전으로 가공 작업을 등록할 수 있는지 확인
 const isRawDataSelectable = (item) => {
@@ -64,19 +63,26 @@ const isRawDataSelectable = (item) => {
   return item.transformBlocked === 0
 }
 
-// 현재 페이지에서 선택 가능한 Raw Data ID 목록
-const currentPageRawDataIds = computed(() => {
+const remainingRawDataSelectionCount = computed(
+  () => maxRawDataSelectionCount - selectedRawDataIds.value.length,
+)
+
+// 불러온 목록에서 선택 가능한 Raw Data ID
+const loadedSelectableRawDataIds = computed(() => {
   return rawDataList.value.filter(isRawDataSelectable).map((item) => item.rawDataId)
 })
 
-// 현재 페이지 전체 선택 여부
-const isCurrentPageSelected = computed(() => {
-  if (currentPageRawDataIds.value.length === 0) {
+// 불러온 항목을 모두 선택했거나 등록 상한에 도달하면 일괄 선택을 완료한 상태로 표시한다.
+const isBulkRawDataSelected = computed(() => {
+  if (loadedSelectableRawDataIds.value.length === 0) {
     return false
   }
 
-  return currentPageRawDataIds.value.every((rawDataId) =>
-    selectedRawDataIds.value.includes(rawDataId),
+  return (
+    remainingRawDataSelectionCount.value === 0 ||
+    loadedSelectableRawDataIds.value.every((rawDataId) =>
+      selectedRawDataIds.value.includes(rawDataId),
+    )
   )
 })
 
@@ -128,20 +134,25 @@ const fetchTransformRuleList = async () => {
 }
 
 // Raw Data 목록 조회
-const fetchRawDataList = async () => {
+const fetchRawDataList = async (page = 1) => {
+  const append = page > 1
   const requestId = ++rawDataRequestId
 
-  // 1. External API가 선택되지 않은 경우 목록을 비운다.
-  if (!selectedExternalApiId.value) {
+  // 1. 첫 조회에서는 이전 목록과 스크롤 상태를 초기화한다.
+  if (!append) {
     rawDataList.value = []
     totalCount.value = 0
-    isRawDataLoading.value = false
+    currentPage.value = 0
     rawDataErrorMessage.value = ''
-    return
   }
 
-  isRawDataLoading.value = true
-  rawDataErrorMessage.value = ''
+  loadMoreErrorMessage.value = ''
+  isLoadingMore.value = append
+  isRawDataLoading.value = !append && Boolean(selectedExternalApiId.value)
+
+  if (!selectedExternalApiId.value) {
+    return
+  }
 
   try {
     // 2. 선택한 API와 규칙 기준으로 Raw Data를 조회한다.
@@ -150,7 +161,7 @@ const fetchRawDataList = async () => {
       transformRuleId: selectedTransformRuleId.value
         ? Number(selectedTransformRuleId.value)
         : undefined,
-      page: currentPage.value,
+      page,
       size: pageSize,
     })
 
@@ -159,9 +170,20 @@ const fetchRawDataList = async () => {
       return
     }
 
-    // 4. 조회 결과와 페이징 정보를 반영한다.
-    rawDataList.value = Array.isArray(response.data.content) ? response.data.content : []
+    // 4. 추가 조회 결과를 기존 목록에 붙이고 성공한 페이지 번호를 기록한다.
+    const items = Array.isArray(response.data.content) ? response.data.content : []
 
+    if (append) {
+      const loadedIds = new Set(rawDataList.value.map((item) => item.rawDataId))
+      rawDataList.value = [
+        ...rawDataList.value,
+        ...items.filter((item) => !loadedIds.has(item.rawDataId)),
+      ]
+    } else {
+      rawDataList.value = items
+    }
+
+    currentPage.value = page
     totalCount.value = Number(response.data.totalCount || 0)
   } catch (error) {
     if (requestId !== rawDataRequestId) {
@@ -170,45 +192,26 @@ const fetchRawDataList = async () => {
 
     console.error('Raw Data 목록 조회 실패:', error)
 
-    rawDataList.value = []
-    totalCount.value = 0
-    rawDataErrorMessage.value = 'Raw Data 목록을 불러오지 못했습니다.'
+    if (append) {
+      loadMoreErrorMessage.value = '다음 Raw Data를 불러오지 못했습니다.'
+    } else {
+      rawDataErrorMessage.value = 'Raw Data 목록을 불러오지 못했습니다.'
+    }
   } finally {
     if (requestId === rawDataRequestId) {
       isRawDataLoading.value = false
+      isLoadingMore.value = false
     }
   }
 }
 
-// External API 변경
-const changeExternalApi = async () => {
-  // 1. 페이지와 선택한 데이터를 초기화한다.
-  currentPage.value = 1
+// External API 또는 가공 규칙 변경
+const changeRawDataFilter = async () => {
+  // 1. 이전 조건에서 선택한 대상과 펼친 이력을 초기화한다.
   selectedRawDataIds.value = []
-
-  // 2. 이전 가공 이력 펼침 상태를 초기화한다.
   clearTransformTaskHistory()
 
-  // 3. 새 조회 전에 이전 목록을 초기화한다.
-  rawDataList.value = []
-  totalCount.value = 0
-
-  // 4. 새 External API의 Raw Data를 조회한다.
-  await fetchRawDataList()
-}
-
-// 가공 규칙 변경
-const changeTransformRule = async () => {
-  // 1. 선택한 데이터를 초기화한다.
-  selectedRawDataIds.value = []
-
-  // 2. 첫 페이지로 이동한다.
-  currentPage.value = 1
-
-  // 3. 가공 이력 펼침 상태를 초기화한다.
-  clearTransformTaskHistory()
-
-  // 4. 새 규칙의 현재 버전 기준으로 다시 조회한다.
+  // 2. 새 조건으로 첫 페이지를 조회한다.
   await fetchRawDataList()
 }
 
@@ -224,13 +227,15 @@ const toggleRawDataSelection = (rawDataId) => {
 
   // 3. 이미 선택한 데이터면 해제한다.
   if (selectedRawDataIds.value.includes(rawDataId)) {
-    selectedRawDataIds.value = selectedRawDataIds.value.filter(
-      (selectedId) => selectedId !== rawDataId,
-    )
+    removeSelectedRawData(rawDataId)
     return
   }
 
-  // 4. 선택 가능한 Raw Data를 추가한다.
+  // 4. 등록 상한에 도달하면 추가 선택을 막는다.
+  if (remainingRawDataSelectionCount.value <= 0) {
+    return
+  }
+
   selectedRawDataIds.value = [...selectedRawDataIds.value, rawDataId]
 }
 
@@ -247,54 +252,80 @@ const removeSelectedRawData = (rawDataId) => {
   )
 }
 
-// 현재 페이지 전체 선택 및 해제
-const toggleCurrentPageSelection = () => {
+// 불러온 목록에서 등록 가능한 건수만큼 선택하거나 전체 선택을 해제한다.
+const toggleLoadedRawDataSelection = () => {
   // 1. 등록 중에는 선택을 변경하지 않는다.
   if (isRegistering.value) {
     return
   }
 
   // 2. 선택 가능한 데이터가 없다면 종료한다.
-  if (currentPageRawDataIds.value.length === 0) {
+  if (loadedSelectableRawDataIds.value.length === 0) {
     return
   }
 
-  // 3. 모두 선택된 경우 현재 페이지의 선택을 해제한다.
-  if (isCurrentPageSelected.value) {
+  // 3. 일괄 선택이 완료된 경우 불러온 목록의 선택을 해제한다.
+  if (isBulkRawDataSelected.value) {
     selectedRawDataIds.value = selectedRawDataIds.value.filter(
-      (rawDataId) => !currentPageRawDataIds.value.includes(rawDataId),
+      (rawDataId) => !loadedSelectableRawDataIds.value.includes(rawDataId),
     )
     return
   }
 
-  // 4. 현재 페이지에서 선택 가능한 데이터만 추가한다.
+  // 4. 기존 선택을 유지하고 남은 자리만큼 표에 표시된 순서로 추가한다.
+  const remainingCount = remainingRawDataSelectionCount.value
+  if (remainingCount <= 0) {
+    return
+  }
+
+  const selectedIds = new Set(selectedRawDataIds.value)
+  const unselectedIds = loadedSelectableRawDataIds.value.filter((id) => !selectedIds.has(id))
   selectedRawDataIds.value = [
-    ...new Set([...selectedRawDataIds.value, ...currentPageRawDataIds.value]),
+    ...selectedRawDataIds.value,
+    ...unselectedIds.slice(0, remainingCount),
   ]
 }
 
-// 페이지 변경
-const changePage = async (page) => {
-  // 1. 페이지 변경 가능 여부를 확인한다.
+// 다음 페이지 조회
+const loadMoreRawData = async () => {
   if (
-    page < 1 ||
-    page > totalPages.value ||
-    page === currentPage.value ||
+    !hasMoreRawData.value ||
     isRawDataLoading.value ||
+    isLoadingMore.value ||
     isRegistering.value
   ) {
     return
   }
 
-  // 2. 이전 가공 이력 영역을 초기화한다.
-  clearTransformTaskHistory()
-
-  // 3. 페이지를 변경한다.
-  currentPage.value = page
-
-  // 4. 변경한 페이지의 목록을 조회한다.
-  await fetchRawDataList()
+  await fetchRawDataList(currentPage.value + 1)
 }
+
+// 페이지를 추가할 때마다 새 목록 끝을 감지한다.
+watch(
+  [rawDataScrollArea, rawDataLoadTrigger, isRegistering],
+  ([scrollArea, trigger, registering], _previousElements, onCleanup) => {
+    if (!scrollArea || !trigger || registering || typeof IntersectionObserver === 'undefined') {
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (
+          entry.isIntersecting &&
+          rawDataLoadTrigger.value === trigger &&
+          !loadMoreErrorMessage.value
+        ) {
+          void loadMoreRawData()
+        }
+      },
+      { root: scrollArea },
+    )
+
+    observer.observe(trigger)
+    onCleanup(() => observer.disconnect())
+  },
+  { flush: 'post' },
+)
 
 // Raw Data 상세 이동
 const goRawDataDetail = (rawDataId) => {
@@ -387,12 +418,12 @@ const registerTransformTasks = async () => {
     return
   }
 
-  if (selectedRawDataIds.value.length > 100) {
-    alert('한 번에 최대 100건까지 등록할 수 있습니다.')
+  if (selectedRawDataIds.value.length > maxRawDataSelectionCount) {
+    alert(`한 번에 최대 ${maxRawDataSelectionCount}건까지 등록할 수 있습니다.`)
     return
   }
 
-  if (isRegistering.value || isRawDataLoading.value) {
+  if (isRegistering.value || isRawDataLoading.value || isLoadingMore.value) {
     return
   }
 
@@ -489,7 +520,7 @@ onUnmounted(() => {
             v-model="selectedExternalApiId"
             :disabled="isExternalApiLoading || isRegistering"
             class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-gray-500 disabled:bg-gray-100"
-            @change="changeExternalApi"
+            @change="changeRawDataFilter"
           >
             <option value="">External API를 선택하세요</option>
 
@@ -518,7 +549,7 @@ onUnmounted(() => {
             v-model="selectedTransformRuleId"
             :disabled="isTransformRuleLoading || isRegistering"
             class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-gray-500 disabled:bg-gray-100"
-            @change="changeTransformRule"
+            @change="changeRawDataFilter"
           >
             <option value="">가공 규칙을 선택하세요</option>
 
@@ -557,7 +588,12 @@ onUnmounted(() => {
 
           <p class="mt-1 text-xs text-gray-500">
             전체 {{ totalCount }}건
-            <template v-if="authStore.isAdmin"> / 선택 {{ selectedRawDataIds.length }}건 </template>
+            <template v-if="authStore.isAdmin"> · {{ selectedRawDataIds.length }}건 선택 </template>
+          </p>
+          <p v-if="authStore.isAdmin" role="status" class="text-xs text-gray-600">
+            <template v-if="remainingRawDataSelectionCount === 0">
+              한 번에 최대 {{ maxRawDataSelectionCount }}건까지 등록할 수 있습니다.
+            </template>
           </p>
         </div>
       </div>
@@ -578,19 +614,22 @@ onUnmounted(() => {
       </div>
 
       <!-- 가공 대상 목록 -->
-      <div v-else class="overflow-x-auto">
+      <div v-else ref="rawDataScrollArea" class="max-h-[min(60vh,36rem)] overflow-auto">
         <table class="w-full min-w-[900px] text-left text-sm">
-          <thead class="bg-gray-50 text-gray-600">
+          <thead class="sticky top-0 z-10 bg-gray-50 text-gray-600">
             <tr>
               <th v-if="authStore.isAdmin" class="px-4 py-3">
                 <input
                   type="checkbox"
-                  :checked="isCurrentPageSelected"
-                  :disabled="
-                    currentPageRawDataIds.length === 0 || isRegistering || isRawDataLoading
+                  :checked="isBulkRawDataSelected"
+                  :indeterminate="selectedRawDataIds.length > 0 && !isBulkRawDataSelected"
+                  :disabled="loadedSelectableRawDataIds.length === 0 || isRegistering"
+                  :aria-label="
+                    isBulkRawDataSelected
+                      ? '불러온 항목의 선택 해제'
+                      : `불러온 항목을 표 순서대로 최대 ${maxRawDataSelectionCount}건까지 선택`
                   "
-                  aria-label="현재 페이지에서 가공 가능한 데이터 전체 선택"
-                  @change="toggleCurrentPageSelection"
+                  @change="toggleLoadedRawDataSelection"
                 />
               </th>
 
@@ -612,13 +651,21 @@ onUnmounted(() => {
                   <input
                     type="checkbox"
                     :checked="selectedRawDataIds.includes(item.rawDataId)"
-                    :disabled="!isRawDataSelectable(item) || isRegistering"
+                    :disabled="
+                      !isRawDataSelectable(item) ||
+                      isRegistering ||
+                      (remainingRawDataSelectionCount === 0 &&
+                        !selectedRawDataIds.includes(item.rawDataId))
+                    "
                     :title="
                       !selectedTransformRuleId
                         ? '가공 규칙을 먼저 선택해 주세요.'
                         : item.transformBlocked === 1
                           ? '현재 규칙 버전에서 이미 등록되었거나 가공 완료된 데이터입니다.'
-                          : '가공 작업 등록 가능'
+                          : remainingRawDataSelectionCount === 0 &&
+                              !selectedRawDataIds.includes(item.rawDataId)
+                            ? '선택 한도에 도달했습니다.'
+                            : '가공 작업 등록 가능'
                     "
                     :aria-label="`Raw Data ${item.rawDataId} 선택`"
                     @change="toggleRawDataSelection(item.rawDataId)"
@@ -780,32 +827,33 @@ onUnmounted(() => {
             </tr>
           </tbody>
         </table>
+        <div
+          v-if="hasMoreRawData"
+          :key="currentPage"
+          ref="rawDataLoadTrigger"
+          class="h-px"
+          aria-hidden="true"
+        ></div>
       </div>
 
-      <!-- 페이징 -->
-      <div
-        v-if="selectedExternalApiId"
-        class="flex items-center justify-between border-t border-gray-200 px-4 py-3"
-      >
-        <span class="text-xs text-gray-500"> {{ currentPage }} / {{ totalPages }} 페이지 </span>
-
-        <div class="flex gap-2">
+      <!-- 추가 조회 -->
+      <div v-if="hasMoreRawData" class="border-t border-gray-200 px-4 py-3 text-center">
+        <p v-if="loadMoreErrorMessage" role="status" class="mb-2 text-sm text-red-600">
+          {{ loadMoreErrorMessage }}
+        </p>
+        <div class="flex flex-wrap items-center justify-center gap-3">
+          <p class="text-xs text-gray-500">
+            {{ totalCount }}건 중 {{ rawDataList.length }}건 불러옴
+          </p>
           <button
             type="button"
-            :disabled="currentPage <= 1 || isRawDataLoading || isRegistering"
+            :disabled="isLoadingMore || isRegistering"
             class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40"
-            @click="changePage(currentPage - 1)"
+            @click="loadMoreRawData"
           >
-            이전
-          </button>
-
-          <button
-            type="button"
-            :disabled="currentPage >= totalPages || isRawDataLoading || isRegistering"
-            class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40"
-            @click="changePage(currentPage + 1)"
-          >
-            다음
+            {{
+              isLoadingMore ? '불러오는 중...' : loadMoreErrorMessage ? '다시 시도' : '더 불러오기'
+            }}
           </button>
         </div>
       </div>
@@ -816,7 +864,9 @@ onUnmounted(() => {
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h3 class="text-sm font-semibold text-gray-900">③ 가공 작업 등록</h3>
 
-        <span class="text-sm text-gray-600"> 선택 {{ selectedRawDataIds.length }}건 </span>
+        <span class="text-sm text-gray-600">
+          선택 {{ selectedRawDataIds.length }}/{{ maxRawDataSelectionCount }}건
+        </span>
       </div>
 
       <!-- 등록 대상 목록 -->
@@ -871,18 +921,17 @@ onUnmounted(() => {
       </div>
 
       <!-- 등록 버튼 -->
-      <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <p class="text-xs text-gray-500">한 번에 최대 100건까지 등록할 수 있습니다.</p>
-
+      <div class="mt-4 flex justify-end">
         <button
           type="button"
           :disabled="
             isRegistering ||
             isRawDataLoading ||
+            isLoadingMore ||
             !selectedExternalApiId ||
             !selectedTransformRuleId ||
             selectedRawDataIds.length === 0 ||
-            selectedRawDataIds.length > 100
+            selectedRawDataIds.length > maxRawDataSelectionCount
           "
           class="rounded-md bg-gray-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
           @click="registerTransformTasks"
