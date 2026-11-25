@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { useToastStore } from '@/stores/toastStore'
@@ -26,25 +26,30 @@ const searchForm = ref({
   endDate: '',
 })
 
+let appliedSearch = { ...searchForm.value }
 const resultList = ref([])
-const currentPage = ref(1)
+const currentPage = ref(0)
 const pageSize = 10
 const totalCount = ref(0)
+const resultScrollArea = ref(null)
+const resultLoadTrigger = ref(null)
 
-// 페이지를 이동해도 선택한 항목을 유지한다.
+// 추가 조회 중에도 선택한 항목을 유지한다.
 const selectedResults = ref([])
+const maxSelectionCount = 100
 
 // 3. 화면 상태
 const isLoadingModels = ref(false)
-const isLoadingModel = ref(false)
 const isLoadingResults = ref(false)
+const isLoadingMore = ref(false)
 const isRegistering = ref(false)
 const errorMessage = ref('')
+const loadMoreErrorMessage = ref('')
 
 // 이전 조회 요청의 응답이 뒤늦게 반영되지 않도록 관리한다.
 let resultRequestId = 0
 
-const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / pageSize)))
+const hasMoreResults = computed(() => currentPage.value * pageSize < totalCount.value)
 
 const selectedResultIds = computed(() =>
   selectedResults.value.map((result) => result.transformResultId),
@@ -69,21 +74,47 @@ const isMatchingResult = (result) => {
  * 가공 결과만 선택할 수 있다.
  */
 const isSelectableResult = (result) => {
-  return isMatchingResult(result) && result.analysisLoadStatus == null
+  return isMatchingResult(result) && !registeredRawDataIds.value.has(result.rawDataId)
 }
 
-// 현재 페이지에서 선택 가능한 가공 결과
+const registeredRawDataIds = computed(
+  () =>
+    new Set(
+      resultList.value
+        .filter((result) => result.analysisLoadStatus != null)
+        .map((result) => result.rawDataId),
+    ),
+)
+const remainingSelectionCount = computed(() => maxSelectionCount - selectedResults.value.length)
+const selectedRawDataIds = computed(
+  () => new Set(selectedResults.value.map((result) => result.rawDataId)),
+)
 const selectableResults = computed(() => resultList.value.filter(isSelectableResult))
 
-const isCurrentPageSelected = computed(() => {
-  if (selectableResults.value.length === 0) {
-    return false
-  }
+// 이미 고른 Raw Data는 유지하고 추가 후보에서도 같은 Raw Data는 한 건만 고른다.
+const additionalSelectableResults = computed(() => {
+  const rawDataIds = new Set(selectedRawDataIds.value)
+  const additionalResults = []
+  for (const result of selectableResults.value) {
+    if (rawDataIds.has(result.rawDataId)) continue
 
-  return selectableResults.value.every((result) =>
-    selectedResultIds.value.includes(result.transformResultId),
-  )
+    rawDataIds.add(result.rawDataId)
+    additionalResults.push(result)
+  }
+  return additionalResults
 })
+
+const isBulkSelectionComplete = computed(
+  () =>
+    selectableResults.value.length > 0 &&
+    (remainingSelectionCount.value === 0 || additionalSelectableResults.value.length === 0),
+)
+
+const canToggleResult = (result) =>
+  !isRegistering.value &&
+  isSelectableResult(result) &&
+  (selectedResultIds.value.includes(result.transformResultId) ||
+    (remainingSelectionCount.value > 0 && !selectedRawDataIds.value.has(result.rawDataId)))
 
 /**
  * 적재 작업 상태를 화면에 표시한다.
@@ -167,131 +198,112 @@ const fetchAnalysisModels = async () => {
 }
 
 /**
- * 적재 모델을 변경한다.
- *
- * 기존에는 모델 상세, 가공 규칙 버전, 가공 결과를
- * 각각 조회했지만 이제 적재 대상 목록 API에서 함께 조회한다.
+ * 적재 모델을 변경하고 모델 정보와 첫 페이지를 조회한다.
  */
 const changeModel = async () => {
-  // 1. 기존 조회 요청을 무효화한다.
-  ++resultRequestId
-
-  // 2. 이전 모델의 조회 및 선택 정보를 초기화한다.
   selectedModel.value = null
   selectedVersion.value = null
   transformVersionNo.value = null
+  appliedSearch = { ...searchForm.value }
 
-  resultList.value = []
-  selectedResults.value = []
-  totalCount.value = 0
-  currentPage.value = 1
-
-  isLoadingResults.value = false
-  errorMessage.value = ''
-
-  // 3. 적재 모델이 선택되지 않았다면 조회하지 않는다.
-  if (!selectedModelId.value) {
-    isLoadingModel.value = false
-    return
-  }
-
-  // 4. 선택한 적재 모델의 정보와 적재 대상 목록을 조회한다.
-  isLoadingModel.value = true
-
-  try {
-    await fetchAnalysisLoads()
-  } finally {
-    isLoadingModel.value = false
-  }
+  await fetchAnalysisLoads()
 }
 
 /**
- * 적재 모델 정보, 가공 결과 및 적재 상태를 한 번에 조회한다.
+ * 적재 모델 정보, 가공 결과 및 적재 상태를 조회한다.
  */
-const fetchAnalysisLoads = async () => {
-  if (!selectedModelId.value) {
-    return
-  }
-
-  // 1. 조회 요청 식별자와 조회 대상 모델을 확정한다.
+const fetchAnalysisLoads = async (page = 1) => {
+  const append = page > 1
   const requestId = ++resultRequestId
   const analysisModelId = Number(selectedModelId.value)
 
-  isLoadingResults.value = true
-  errorMessage.value = ''
+  // 1. 첫 조회에서는 기존 목록과 선택을 초기화한다.
+  if (!append) {
+    resultList.value = []
+    selectedResults.value = []
+    totalCount.value = 0
+    currentPage.value = 0
+    errorMessage.value = ''
+  }
+
+  loadMoreErrorMessage.value = ''
+  isLoadingResults.value = !append && Boolean(analysisModelId)
+  isLoadingMore.value = append
+
+  if (!analysisModelId) return
 
   try {
-    // 2. 적재 대상 목록 API를 호출한다.
-    const response = await getAnalysisLoadList({
+    // 2. 다음 페이지에도 최초 조회에 적용한 날짜 조건을 사용한다.
+    const { data } = await getAnalysisLoadList({
       analysisModelId,
-      startDate: searchForm.value.startDate || undefined,
-      endDate: searchForm.value.endDate || undefined,
-      page: currentPage.value,
+      startDate: appliedSearch.startDate || undefined,
+      endDate: appliedSearch.endDate || undefined,
+      page,
       size: pageSize,
     })
 
-    // 3. 이전 요청의 결과는 반영하지 않는다.
     if (requestId !== resultRequestId || analysisModelId !== Number(selectedModelId.value)) {
       return
     }
 
-    const data = response.data
-
-    // 4. 백엔드 응답을 검증한다.
     if (!data?.model || !data?.version || data.transformVersionNo == null) {
       throw new Error('데이터 적재 대상 조회 응답이 올바르지 않습니다.')
     }
 
-    // 5. 적재 모델 버전이 변경되었다면 이전 선택을 초기화한다.
+    // 3. 모델 버전이 바뀌면 서로 다른 버전의 행을 섞지 않고 첫 페이지부터 조회한다.
     if (
-      selectedVersion.value &&
-      Number(selectedVersion.value.analysisModelVersionId) !==
-        Number(data.version.analysisModelVersionId)
+      append &&
+      (Number(selectedVersion.value.analysisModelVersionId) !==
+        Number(data.version.analysisModelVersionId) ||
+        Number(transformVersionNo.value) !== Number(data.transformVersionNo))
     ) {
-      selectedResults.value = []
+      await fetchAnalysisLoads()
+      return
     }
 
-    // 6. 적재 모델 및 가공 규칙 버전 정보를 설정한다.
     selectedModel.value = data.model
     selectedVersion.value = data.version
     transformVersionNo.value = data.transformVersionNo
 
-    // 7. 적재 대상 목록과 페이징 정보를 설정한다.
-    resultList.value = Array.isArray(data.content) ? data.content : []
-    totalCount.value = Number(data.totalCount || 0)
-
-    // 8. 현재 페이지에서 이미 등록된 Raw Data는 선택 목록에서도 제외한다.
-    const registeredRawDataIds = new Set(
-      resultList.value
-        .filter((result) => result.analysisLoadStatus != null)
-        .map((result) => result.rawDataId),
+    // 4. 기존 행 순서를 유지하며 결과 ID별 최신 응답을 반영한다.
+    const resultsById = new Map(
+      resultList.value.map((result) => [result.transformResultId, result]),
     )
-
-    selectedResults.value = selectedResults.value.filter(
-      (result) => !registeredRawDataIds.has(result.rawDataId),
-    )
-  } catch (error) {
-    if (requestId !== resultRequestId) {
-      return
+    const content = Array.isArray(data.content) ? data.content : []
+    for (const result of content) {
+      resultsById.set(result.transformResultId, result)
     }
+
+    resultList.value = [...resultsById.values()]
+    totalCount.value = Number(data.totalCount || 0)
+    currentPage.value = page
+
+    // 5. 현재 조회에서 이미 등록된 것으로 확인한 Raw Data는 선택에서 제외한다.
+    selectedResults.value = selectedResultIds.value
+      .map((id) => resultsById.get(id))
+      .filter(isSelectableResult)
+  } catch (error) {
+    if (requestId !== resultRequestId) return
 
     console.error('데이터 적재 대상 조회 실패:', error)
 
-    selectedModel.value = null
-    selectedVersion.value = null
-    transformVersionNo.value = null
-
-    resultList.value = []
-    totalCount.value = 0
-    selectedResults.value = []
-
-    errorMessage.value =
+    const message =
       typeof error.response?.data === 'string'
         ? error.response.data
         : error.message || '데이터 적재 대상 목록을 불러오지 못했습니다.'
+
+    if (append) {
+      loadMoreErrorMessage.value = message
+    } else {
+      selectedModel.value = null
+      selectedVersion.value = null
+      transformVersionNo.value = null
+      errorMessage.value = message
+    }
   } finally {
     if (requestId === resultRequestId) {
       isLoadingResults.value = false
+      isLoadingMore.value = false
     }
   }
 }
@@ -316,12 +328,9 @@ const searchResults = () => {
     return
   }
 
-  // 3. 페이지와 기존 선택 정보를 초기화한다.
-  currentPage.value = 1
-  selectedResults.value = []
-
-  // 4. 적재 대상 목록을 다시 조회한다.
-  fetchAnalysisLoads()
+  // 3. 날짜 조건을 확정하고 첫 페이지부터 조회한다.
+  appliedSearch = { ...searchForm.value }
+  return fetchAnalysisLoads()
 }
 
 /**
@@ -334,44 +343,57 @@ const resetSearch = () => {
     endDate: '',
   }
 
-  // 2. 첫 페이지로 이동하고 선택 정보를 초기화한다.
-  currentPage.value = 1
-  selectedResults.value = []
-
-  // 3. 적재 대상 목록을 다시 조회한다.
-  if (selectedModelId.value) {
-    fetchAnalysisLoads()
-  }
+  // 2. 기본 조건으로 첫 페이지부터 조회한다.
+  appliedSearch = { ...searchForm.value }
+  return fetchAnalysisLoads()
 }
 
-/**
- * 페이지를 변경한다.
- */
-const changePage = (page) => {
-  // 1. 페이지 변경 가능 여부를 확인한다.
+const loadMoreResults = async () => {
   if (
-    page < 1 ||
-    page > totalPages.value ||
-    page === currentPage.value ||
+    !hasMoreResults.value ||
     isLoadingResults.value ||
+    isLoadingMore.value ||
     isRegistering.value
   ) {
     return
   }
 
-  // 2. 페이지를 변경한다.
-  currentPage.value = page
-
-  // 3. 선택한 모델의 적재 대상 목록을 다시 조회한다.
-  fetchAnalysisLoads()
+  await fetchAnalysisLoads(currentPage.value + 1)
 }
+
+// 표 안의 마지막 행 아래에 도달하면 다음 페이지를 불러온다.
+watch(
+  [resultScrollArea, resultLoadTrigger, isRegistering],
+  ([scrollArea, trigger, registering], _previousElements, onCleanup) => {
+    if (!scrollArea || !trigger || registering || typeof IntersectionObserver === 'undefined') {
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (
+          entry.isIntersecting &&
+          resultLoadTrigger.value === trigger &&
+          !loadMoreErrorMessage.value
+        ) {
+          void loadMoreResults()
+        }
+      },
+      { root: scrollArea },
+    )
+
+    observer.observe(trigger)
+    onCleanup(() => observer.disconnect())
+  },
+  { flush: 'post' },
+)
 
 /**
  * 가공 결과를 선택하거나 선택 해제한다.
  */
 const toggleResultSelection = (result) => {
   // 1. 관리자 권한과 선택 가능 여부를 확인한다.
-  if (!authStore.isAdmin || isRegistering.value || !isSelectableResult(result)) {
+  if (!authStore.isAdmin || !canToggleResult(result)) {
     return
   }
 
@@ -385,51 +407,30 @@ const toggleResultSelection = (result) => {
     return
   }
 
-  // 3. 등록 가능한 최대 건수를 확인한다.
-  if (selectedResults.value.length >= 100) {
-    errorMessage.value = '적재 작업은 한 번에 최대 100건까지 등록할 수 있습니다.'
-    return
-  }
-
-  // 4. 선택한 가공 결과를 추가한다.
+  // 3. 선택한 가공 결과를 추가한다.
   selectedResults.value = [...selectedResults.value, result]
   errorMessage.value = ''
 }
 
 /**
- * 현재 페이지 전체 선택 및 해제
+ * 불러온 목록의 적재 가능 항목을 한도까지 선택하거나 선택을 해제한다.
  */
-const toggleCurrentPageSelection = () => {
-  // 1. 관리자 권한 및 등록 상태를 확인한다.
-  if (!authStore.isAdmin || isRegistering.value) {
+const toggleLoadedResultsSelection = () => {
+  if (!authStore.isAdmin || isRegistering.value || selectableResults.value.length === 0) {
     return
   }
 
-  const currentIds = selectableResults.value.map((result) => result.transformResultId)
-
-  // 2. 현재 페이지의 선택 가능한 결과가 모두 선택됐다면 해제한다.
-  if (isCurrentPageSelected.value) {
-    selectedResults.value = selectedResults.value.filter(
-      (result) => !currentIds.includes(result.transformResultId),
-    )
+  // 1. 일괄 선택이 완료된 상태에서는 선택을 해제한다.
+  if (isBulkSelectionComplete.value) {
+    selectedResults.value = []
     return
   }
 
-  // 3. 아직 선택되지 않은 결과만 추가한다.
-  const existingIds = new Set(selectedResultIds.value)
-
-  const additionalResults = selectableResults.value.filter(
-    (result) => !existingIds.has(result.transformResultId),
-  )
-
-  // 4. 최대 등록 건수를 검증한다.
-  if (selectedResults.value.length + additionalResults.length > 100) {
-    errorMessage.value = '적재 작업은 한 번에 최대 100건까지 등록할 수 있습니다.'
-    return
-  }
-
-  // 5. 선택 결과를 추가한다.
-  selectedResults.value = [...selectedResults.value, ...additionalResults]
+  // 2. 기존 선택은 유지하고 표 순서대로 남은 자리만큼 채운다.
+  selectedResults.value = [
+    ...selectedResults.value,
+    ...additionalSelectableResults.value.slice(0, remainingSelectionCount.value),
+  ]
   errorMessage.value = ''
 }
 
@@ -467,8 +468,8 @@ const validateForm = () => {
   }
 
   // 3. 최대 등록 건수를 검증한다.
-  if (selectedResults.value.length > 100) {
-    errorMessage.value = '한 번에 최대 100건까지 등록할 수 있습니다.'
+  if (selectedResults.value.length > maxSelectionCount) {
+    errorMessage.value = `한 번에 최대 ${maxSelectionCount}건까지 등록할 수 있습니다.`
     return false
   }
 
@@ -495,7 +496,7 @@ const validateForm = () => {
  */
 const registerAnalysisLoads = async () => {
   // 1. 관리자 권한과 중복 요청 여부를 확인한다.
-  if (!authStore.isAdmin || isRegistering.value || isLoadingModel.value || isLoadingResults.value) {
+  if (!authStore.isAdmin || isRegistering.value || isLoadingResults.value || isLoadingMore.value) {
     return
   }
 
@@ -533,10 +534,7 @@ const registerAnalysisLoads = async () => {
       `${registeredCount}건의 적재 작업이 대기 상태로 등록되었습니다.`,
     )
 
-    // 7. 선택 정보를 초기화한다.
-    selectedResults.value = []
-
-    // 8. 최신 적재 작업 상태를 다시 조회한다.
+    // 7. 선택을 초기화하고 첫 페이지부터 최신 적재 상태를 조회한다.
     await fetchAnalysisLoads()
   } catch (error) {
     console.error('데이터 적재 작업 등록 실패:', error)
@@ -671,7 +669,12 @@ onUnmounted(() => {
 
           <p class="mt-1 text-xs text-gray-500">
             전체 {{ totalCount }}건
-            <template v-if="authStore.isAdmin"> / 선택 {{ selectedResults.length }}건 </template>
+            <template v-if="authStore.isAdmin"> · {{ selectedResults.length }}건 선택 </template>
+          </p>
+          <p v-if="authStore.isAdmin" role="status" class="text-xs text-gray-600">
+            <template v-if="remainingSelectionCount === 0">
+              한 번에 최대 {{ maxSelectionCount }}건까지 등록할 수 있습니다.
+            </template>
           </p>
         </div>
       </div>
@@ -682,26 +685,32 @@ onUnmounted(() => {
       </div>
 
       <!-- 조회 중 -->
-      <div
-        v-else-if="isLoadingModel || isLoadingResults"
-        class="p-10 text-center text-sm text-gray-500"
-      >
+      <div v-else-if="isLoadingResults" class="p-10 text-center text-sm text-gray-500">
         가공 결과를 불러오는 중입니다.
       </div>
 
       <!-- 적재 대상 목록 -->
-      <div v-else class="overflow-x-auto">
+      <div
+        v-else
+        ref="resultScrollArea"
+        class="m-4 max-h-[min(60vh,36rem)] overflow-auto rounded-md border border-gray-200"
+      >
         <table class="w-full min-w-[950px] text-sm">
-          <thead class="border-b border-gray-200 bg-gray-50">
+          <thead class="sticky top-0 z-10 border-b border-gray-200 bg-gray-50">
             <tr>
-              <!-- 현재 페이지 전체 선택 -->
+              <!-- 불러온 항목 일괄 선택 -->
               <th v-if="authStore.isAdmin" class="px-4 py-3 text-center">
                 <input
                   type="checkbox"
-                  :checked="isCurrentPageSelected"
+                  :checked="isBulkSelectionComplete"
+                  :indeterminate="selectedResults.length > 0 && !isBulkSelectionComplete"
                   :disabled="selectableResults.length === 0 || isRegistering"
-                  aria-label="현재 페이지 적재 가능 항목 전체 선택"
-                  @change="toggleCurrentPageSelection"
+                  :aria-label="
+                    isBulkSelectionComplete
+                      ? '불러온 항목의 선택 해제'
+                      : `불러온 적재 가능 항목을 최대 ${maxSelectionCount}건까지 선택`
+                  "
+                  @change="toggleLoadedResultsSelection"
                 />
               </th>
 
@@ -727,7 +736,7 @@ onUnmounted(() => {
                 <input
                   type="checkbox"
                   :checked="selectedResultIds.includes(result.transformResultId)"
-                  :disabled="!isSelectableResult(result) || isRegistering"
+                  :disabled="!canToggleResult(result)"
                   :aria-label="`가공 결과 ${result.transformResultId} 선택`"
                   @change="toggleResultSelection(result)"
                 />
@@ -784,34 +793,33 @@ onUnmounted(() => {
             </tr>
           </tbody>
         </table>
+        <div
+          v-if="hasMoreResults"
+          :key="currentPage"
+          ref="resultLoadTrigger"
+          class="h-px"
+          aria-hidden="true"
+        ></div>
       </div>
 
-      <!-- 페이지 이동 -->
-      <div
-        v-if="totalCount > 0"
-        class="flex items-center justify-between border-t border-gray-200 p-4 text-sm"
-      >
-        <span class="text-gray-500"> 전체 {{ totalCount }}건 </span>
-
-        <div class="flex items-center gap-3">
+      <!-- 추가 조회 -->
+      <div v-if="hasMoreResults" class="border-t border-gray-200 px-4 py-3 text-center">
+        <p v-if="loadMoreErrorMessage" role="status" class="mb-2 text-sm text-red-600">
+          {{ loadMoreErrorMessage }}
+        </p>
+        <div class="flex flex-wrap items-center justify-center gap-3">
+          <p class="text-xs text-gray-500">
+            {{ totalCount }}건 중 {{ resultList.length }}건 불러옴
+          </p>
           <button
             type="button"
-            :disabled="currentPage <= 1 || isLoadingResults || isRegistering"
-            class="rounded border border-gray-300 px-3 py-1.5 disabled:opacity-50"
-            @click="changePage(currentPage - 1)"
+            :disabled="isLoadingMore || isRegistering"
+            class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+            @click="loadMoreResults"
           >
-            이전
-          </button>
-
-          <span>{{ currentPage }} / {{ totalPages }}</span>
-
-          <button
-            type="button"
-            :disabled="currentPage >= totalPages || isLoadingResults || isRegistering"
-            class="rounded border border-gray-300 px-3 py-1.5 disabled:opacity-50"
-            @click="changePage(currentPage + 1)"
-          >
-            다음
+            {{
+              isLoadingMore ? '불러오는 중...' : loadMoreErrorMessage ? '다시 시도' : '더 불러오기'
+            }}
           </button>
         </div>
       </div>
@@ -877,7 +885,7 @@ onUnmounted(() => {
       <div class="mt-4 flex justify-end">
         <button
           type="button"
-          :disabled="isRegistering"
+          :disabled="isRegistering || isLoadingResults || isLoadingMore"
           class="rounded-md bg-gray-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
           @click="registerAnalysisLoads"
         >
