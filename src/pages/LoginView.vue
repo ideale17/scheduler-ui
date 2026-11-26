@@ -2,11 +2,13 @@
 import { onMounted, ref } from 'vue'
 import { getGuestLoginEnabled, getSignupEnabled } from '@/api/authApi'
 import { useAuthStore } from '@/stores/authStore'
+import { useToastStore } from '@/stores/toastStore'
 import { useRouter, useRoute } from 'vue-router'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+const toastStore = useToastStore()
 const username = ref('')
 const password = ref('')
 const err = ref('')
@@ -31,6 +33,8 @@ const login = async (mode) => {
       // 서버가 세션을 확인하지 못하면 라우터가 로그인 화면으로 돌려보낸다.
       if (router.currentRoute.value.path === '/login') {
         err.value = '게스트 로그인 세션을 확인하지 못했습니다. 다시 시도해 주세요.'
+      } else if (authStore.isGuest) {
+        toastStore.info('게스트는 조회만 할 수 있습니다.')
       }
     } else {
       await authStore.login(username.value, password.value)

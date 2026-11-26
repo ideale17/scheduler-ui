@@ -7,6 +7,7 @@ const toastStore = useToastStore()
 const iconClass = computed(() => {
   const classes = {
     success: 'bg-green-100 text-green-700',
+    info: 'bg-blue-100 text-blue-700',
     warning: 'bg-yellow-100 text-yellow-700',
     error: 'bg-red-100 text-red-700',
   }
@@ -17,6 +18,7 @@ const iconClass = computed(() => {
 const iconSymbol = computed(() => {
   const symbols = {
     success: '✓',
+    info: 'i',
     warning: '!',
     error: '×',
   }
@@ -39,7 +41,7 @@ const iconSymbol = computed(() => {
       class="pointer-events-none fixed inset-x-0 top-20 z-50 flex justify-center px-4"
     >
       <div
-        role="alert"
+        :role="toastStore.toast.type === 'info' ? 'status' : 'alert'"
         class="pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-lg"
       >
         <!-- 알림 종류별 아이콘 -->

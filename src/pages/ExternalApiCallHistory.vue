@@ -7,11 +7,13 @@ import {
   getExternalApiCallAttemptDetail,
 } from '@/api/externalApiCallHistoryApi'
 import { restartExternalApi } from '@/api/externalApi'
+import { useAuthStore } from '@/stores/authStore'
 import { useToastStore } from '@/stores/toastStore'
 
 // 화면 상태
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 
 const toastStore = useToastStore()
 const restartingExecutionId = ref(null)
@@ -237,7 +239,12 @@ const fetchCallHistoryList = async () => {
 }
 
 const restartHistory = async (history) => {
-  if (history.status !== 'FAILED' || !history.executionId || restartingExecutionId.value) {
+  if (
+    authStore.isGuest ||
+    history.status !== 'FAILED' ||
+    !history.executionId ||
+    restartingExecutionId.value
+  ) {
     return
   }
 
@@ -684,7 +691,7 @@ onUnmounted(() => {
                   <button
                     v-if="history.executionId"
                     type="button"
-                    :disabled="restartingExecutionId !== null"
+                    :disabled="authStore.isGuest || restartingExecutionId !== null"
                     class="shrink-0 rounded-md border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
                     @click="restartHistory(history)"
                   >

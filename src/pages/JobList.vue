@@ -13,6 +13,7 @@ import {
 
 const router = useRouter()
 const authStore = useAuthStore()
+const showAdminActions = computed(() => authStore.isAdmin || authStore.isGuest)
 const jobList = ref([])
 const selectedJobKeys = ref([])
 const isRefreshing = ref(false)
@@ -25,6 +26,14 @@ const processingAction = ref(null)
 
 // 현재 삭제 요청 중인 Job의 식별자를 관리한다.
 const deletingJobKey = ref(null)
+
+const canProcessSelectedJobs = computed(
+  () =>
+    authStore.isAdmin &&
+    selectedJobKeys.value.length > 0 &&
+    processingAction.value === null &&
+    deletingJobKey.value === null,
+)
 
 const getJobKey = (job) => {
   return `${job.jobGroup}:${job.jobName}`
@@ -80,7 +89,7 @@ const refreshJobList = async () => {
 
 const deleteJob = async (jobName, jobGroup) => {
   // 1. 다른 Job의 삭제 요청이 진행 중이면 중복 실행을 방지한다.
-  if (deletingJobKey.value !== null || processingAction.value !== null) {
+  if (!authStore.isAdmin || deletingJobKey.value !== null || processingAction.value !== null) {
     return
   }
 
@@ -126,7 +135,7 @@ const deleteJob = async (jobName, jobGroup) => {
  */
 const processSelectedJobs = async (action) => {
   // 1. 다른 일괄 작업이 진행 중이면 중복 요청을 방지한다.
-  if (processingAction.value !== null || deletingJobKey.value !== null) {
+  if (!authStore.isAdmin || processingAction.value !== null || deletingJobKey.value !== null) {
     return
   }
 
@@ -309,9 +318,10 @@ onMounted(() => {
         </button>
 
         <button
-          v-if="authStore.isAdmin"
+          v-if="showAdminActions"
           type="button"
-          class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
+          :disabled="!authStore.isAdmin"
+          class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
           @click="router.push('/add')"
         >
           Job 등록
@@ -321,7 +331,7 @@ onMounted(() => {
 
     <!-- 선택 작업 -->
     <div
-      v-if="authStore.isAdmin"
+      v-if="showAdminActions"
       class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3"
     >
       <div class="text-sm text-gray-500">
@@ -336,9 +346,7 @@ onMounted(() => {
         <div class="group relative">
           <button
             type="button"
-            :disabled="
-              selectedJobKeys.length === 0 || processingAction !== null || deletingJobKey !== null
-            "
+            :disabled="!canProcessSelectedJobs"
             class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
             @click="processSelectedJobs('run')"
           >
@@ -361,9 +369,7 @@ onMounted(() => {
         <div class="group relative">
           <button
             type="button"
-            :disabled="
-              selectedJobKeys.length === 0 || processingAction !== null || deletingJobKey !== null
-            "
+            :disabled="!canProcessSelectedJobs"
             class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
             @click="processSelectedJobs('resume')"
           >
@@ -387,9 +393,7 @@ onMounted(() => {
         <div class="group relative">
           <button
             type="button"
-            :disabled="
-              selectedJobKeys.length === 0 || processingAction !== null || deletingJobKey !== null
-            "
+            :disabled="!canProcessSelectedJobs"
             class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
             @click="processSelectedJobs('pause')"
           >
@@ -419,12 +423,11 @@ onMounted(() => {
       <table class="w-full text-sm">
         <thead class="border-b border-gray-200 bg-gray-50">
           <tr>
-            <th v-if="authStore.isAdmin" class="w-12 px-4 py-3 text-center">
+            <th class="w-12 px-4 py-3 text-center">
               <input
                 v-model="allSelected"
                 type="checkbox"
                 :disabled="processingAction !== null"
-                class="h-4 w-4 rounded border-gray-300"
               />
             </th>
 
@@ -464,13 +467,12 @@ onMounted(() => {
             :key="job.jobName + job.jobGroup"
             class="transition-colors hover:bg-gray-50"
           >
-            <td v-if="authStore.isAdmin" class="px-4 py-3 text-center">
+            <td class="px-4 py-3 text-center">
               <input
                 v-model="selectedJobKeys"
                 type="checkbox"
                 :value="getJobKey(job)"
                 :disabled="processingAction !== null"
-                class="h-4 w-4 rounded border-gray-300"
               />
             </td>
 
@@ -536,18 +538,19 @@ onMounted(() => {
                 </button>
 
                 <button
-                  v-if="authStore.isAdmin"
+                  v-if="showAdminActions"
                   type="button"
-                  class="rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                  :disabled="!authStore.isAdmin"
+                  class="rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
                   @click="editJob(job.jobName, job.jobGroup)"
                 >
                   수정
                 </button>
 
                 <button
-                  v-if="authStore.isAdmin"
+                  v-if="showAdminActions"
                   type="button"
-                  :disabled="deletingJobKey !== null"
+                  :disabled="!authStore.isAdmin || deletingJobKey !== null"
                   class="rounded-md px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                   @click="deleteJob(job.jobName, job.jobGroup)"
                 >
@@ -581,9 +584,10 @@ onMounted(() => {
       </p>
 
       <button
-        v-if="authStore.isAdmin"
+        v-if="showAdminActions"
         type="button"
-        class="mt-4 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
+        :disabled="!authStore.isAdmin"
+        class="mt-4 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
         @click="router.push('/add')"
       >
         새 Job 등록

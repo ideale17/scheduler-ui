@@ -47,6 +47,10 @@ export const useToastStore = defineStore('toast', () => {
     show('success', title, message, 3000)
   }
 
+  const info = (title, message = '') => {
+    show('info', title, message, 3000)
+  }
+
   const warning = (title, message = '') => {
     show('warning', title, message, 6000)
   }
@@ -60,6 +64,7 @@ export const useToastStore = defineStore('toast', () => {
     show,
     hide,
     success,
+    info,
     warning,
     error,
   }

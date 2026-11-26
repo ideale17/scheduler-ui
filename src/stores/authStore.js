@@ -21,6 +21,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   // 관리자 권한 보유 여부를 확인한다.
   const isAdmin = computed(() => hasRole('ROLE_ADMIN'))
+  const isGuest = computed(() => hasRole('ROLE_GUEST'))
 
   /**
    * 현재 로그인한 사용자 정보를 조회한다.
@@ -93,6 +94,7 @@ export const useAuthStore = defineStore('auth', () => {
     isAuthenticated,
     hasRole,
     isAdmin,
+    isGuest,
     loadCurrentUser,
     login,
     loginAsGuest,

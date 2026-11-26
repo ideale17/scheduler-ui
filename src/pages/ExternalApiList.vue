@@ -1,11 +1,12 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { executeExternalApi, getExternalApiList } from '@/api/externalApi'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const showAdminActions = computed(() => authStore.isAdmin || authStore.isGuest)
 
 const externalApiList = ref([])
 const isLoading = ref(false)
@@ -86,7 +87,7 @@ const resetSearch = () => {
 }
 
 const executeApi = async (externalApi) => {
-  if (!confirm(`${externalApi.apiName} API를 즉시 실행하시겠습니까?`)) {
+  if (!authStore.isAdmin || !confirm(`${externalApi.apiName} API를 즉시 실행하시겠습니까?`)) {
     return
   }
 
@@ -214,9 +215,10 @@ onMounted(() => {
     <!-- API 등록 -->
     <div class="flex justify-end">
       <button
-        v-if="authStore.isAdmin"
+        v-if="showAdminActions"
         type="button"
-        class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
+        :disabled="!authStore.isAdmin"
+        class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
         @click="router.push('/externalApi/add')"
       >
         API 등록
@@ -327,9 +329,10 @@ onMounted(() => {
                 </button>
 
                 <button
-                  v-if="authStore.isAdmin"
+                  v-if="showAdminActions"
                   type="button"
-                  class="rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                  :disabled="!authStore.isAdmin"
+                  class="rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
                   @click="executeApi(externalApi)"
                 >
                   즉시 실행
@@ -364,9 +367,10 @@ onMounted(() => {
         </p>
 
         <button
-          v-if="authStore.isAdmin"
+          v-if="showAdminActions"
           type="button"
-          class="mt-4 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
+          :disabled="!authStore.isAdmin"
+          class="mt-4 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
           @click="router.push('/externalApi/add')"
         >
           API 등록

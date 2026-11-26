@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { useToastStore } from '@/stores/toastStore'
@@ -16,6 +16,7 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const toastStore = useToastStore()
+const showAdminActions = computed(() => authStore.isAdmin || authStore.isGuest)
 
 const externalApi = ref(null)
 const paging = ref(null)
@@ -25,6 +26,7 @@ const loading = ref(true)
 
 // 즉시 실행 및 삭제 요청 상태를 구분한다.
 const processingAction = ref(null)
+const canManageApi = computed(() => authStore.isAdmin && processingAction.value === null)
 
 // 날짜·시간 오프셋 단위를 화면에 표시할 이름으로 변환한다.
 const getOffsetUnitLabel = (offsetUnit) => {
@@ -110,8 +112,7 @@ const fetchExternalApiDetail = async () => {
 }
 
 const executeApi = async () => {
-  // API 정보가 없거나 다른 작업이 진행 중이면 종료한다.
-  if (!externalApi.value || processingAction.value !== null) {
+  if (!externalApi.value || !canManageApi.value) {
     return
   }
 
@@ -160,8 +161,7 @@ const getMethodClass = (httpMethod) => {
 }
 
 const deleteApi = async () => {
-  // API 정보가 없거나 다른 작업이 진행 중이면 종료한다.
-  if (!externalApi.value || processingAction.value !== null) {
+  if (!externalApi.value || !canManageApi.value) {
     return
   }
 
@@ -227,9 +227,9 @@ onMounted(() => {
 
           <div class="flex flex-wrap items-center gap-2">
             <button
-              v-if="authStore.isAdmin"
+              v-if="showAdminActions"
               type="button"
-              :disabled="processingAction !== null"
+              :disabled="!canManageApi"
               class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
               @click="executeApi"
             >
@@ -246,9 +246,9 @@ onMounted(() => {
             </button>
 
             <button
-              v-if="authStore.isAdmin"
+              v-if="showAdminActions"
               type="button"
-              :disabled="processingAction !== null"
+              :disabled="!canManageApi"
               class="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
               @click="router.push(`/externalApi/${externalApi.externalApiId}/edit`)"
             >
@@ -256,9 +256,9 @@ onMounted(() => {
             </button>
 
             <button
-              v-if="authStore.isAdmin"
+              v-if="showAdminActions"
               type="button"
-              :disabled="processingAction !== null"
+              :disabled="!canManageApi"
               class="rounded-md px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
               @click="deleteApi"
             >

@@ -2,10 +2,12 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getJobHistory } from '@/api/jobHistoryApi'
+import { useAuthStore } from '@/stores/authStore'
 
 // 1. 화면 상태
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 
 const historyList = ref([])
 const selectedHistoryId = ref(null)
@@ -212,7 +214,7 @@ const toggleHistoryDetail = async (logId) => {
 
 // 11. API 호출 이력 이동
 const goApiCallHistory = (fireInstanceId) => {
-  if (!fireInstanceId) {
+  if (authStore.isGuest || !fireInstanceId) {
     return
   }
 
@@ -531,7 +533,8 @@ onUnmounted(() => {
                   >
                     <button
                       type="button"
-                      class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      :disabled="authStore.isGuest"
+                      class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
                       @click="goApiCallHistory(h.fireInstanceId)"
                     >
                       API 호출 이력 보기 →
