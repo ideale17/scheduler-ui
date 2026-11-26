@@ -144,6 +144,7 @@ const fetchRawDataList = async (page = 1) => {
     totalCount.value = 0
     currentPage.value = 0
     rawDataErrorMessage.value = ''
+    rawDataScrollArea.value?.scrollTo(0, 0)
   }
 
   loadMoreErrorMessage.value = ''
@@ -598,27 +599,22 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- API 미선택 -->
-      <div v-if="!selectedExternalApiId" class="p-8 text-center text-sm text-gray-500">
-        External API를 선택하면 가공 대상 Raw Data가 표시됩니다.
-      </div>
-
-      <!-- 로딩 -->
-      <div v-else-if="isRawDataLoading" class="p-6 text-sm text-gray-500">
-        Raw Data 목록을 불러오는 중입니다.
-      </div>
-
-      <!-- 조회 오류 -->
-      <div v-else-if="rawDataErrorMessage" class="p-6 text-sm text-red-600">
-        {{ rawDataErrorMessage }}
-      </div>
-
       <!-- 가공 대상 목록 -->
-      <div v-else ref="rawDataScrollArea" class="max-h-[min(60vh,36rem)] overflow-auto">
-        <table class="w-full min-w-[900px] text-left text-sm">
+      <div
+        ref="rawDataScrollArea"
+        class="m-4 max-h-[min(60vh,36rem)] overflow-auto rounded-md border border-gray-200"
+      >
+        <table
+          class="w-full text-left text-sm"
+          :class="
+            rawDataList.length
+              ? 'min-w-[900px]'
+              : 'table-fixed [overflow-wrap:anywhere] max-sm:[&_th]:px-1'
+          "
+        >
           <thead class="sticky top-0 z-10 bg-gray-50 text-gray-600">
             <tr>
-              <th v-if="authStore.isAdmin" class="px-4 py-3">
+              <th v-if="authStore.isAdmin" class="px-4 py-3" :class="{ 'w-12': !rawDataList.length }">
                 <input
                   type="checkbox"
                   :checked="isBulkRawDataSelected"
@@ -719,7 +715,7 @@ onUnmounted(() => {
 
               <!-- Raw Data별 가공 작업 이력 -->
               <tr v-if="expandedRawDataId === item.rawDataId">
-                <td colspan="8" class="bg-gray-50 px-6 py-4">
+                <td :colspan="authStore.isAdmin ? 8 : 7" class="bg-gray-50 px-6 py-4">
                   <div class="rounded-lg border border-gray-200 bg-white p-4">
                     <h4 class="mb-3 text-sm font-semibold text-gray-900">
                       Raw Data #{{ item.rawDataId }} 가공 이력
@@ -819,10 +815,19 @@ onUnmounted(() => {
               </tr>
             </template>
 
-            <!-- Raw Data 없음 -->
+            <!-- 목록 안내 -->
             <tr v-if="rawDataList.length === 0">
-              <td colspan="8" class="px-4 py-8 text-center text-gray-500">
-                조회된 Raw Data가 없습니다.
+              <td :colspan="authStore.isAdmin ? 8 : 7" class="px-4 py-8 text-center text-gray-500">
+                <template v-if="!selectedExternalApiId">
+                  External API를 선택하면 가공 대상 Raw Data가 표시됩니다.
+                </template>
+                <span v-else-if="isRawDataLoading" role="status">
+                  Raw Data 목록을 불러오는 중입니다.
+                </span>
+                <span v-else-if="rawDataErrorMessage" role="alert" class="text-red-600">
+                  {{ rawDataErrorMessage }}
+                </span>
+                <template v-else>조회된 Raw Data가 없습니다.</template>
               </td>
             </tr>
           </tbody>

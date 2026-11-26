@@ -224,6 +224,7 @@ const fetchAnalysisLoads = async (page = 1) => {
     totalCount.value = 0
     currentPage.value = 0
     errorMessage.value = ''
+    resultScrollArea.value?.scrollTo(0, 0)
   }
 
   loadMoreErrorMessage.value = ''
@@ -679,27 +680,27 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- 모델 미선택 -->
-      <div v-if="!selectedModelId" class="p-10 text-center text-sm text-gray-500">
-        적재 모델을 선택하면 가공 결과 목록이 표시됩니다.
-      </div>
-
-      <!-- 조회 중 -->
-      <div v-else-if="isLoadingResults" class="p-10 text-center text-sm text-gray-500">
-        가공 결과를 불러오는 중입니다.
-      </div>
-
       <!-- 적재 대상 목록 -->
       <div
-        v-else
         ref="resultScrollArea"
         class="m-4 max-h-[min(60vh,36rem)] overflow-auto rounded-md border border-gray-200"
       >
-        <table class="w-full min-w-[950px] text-sm">
+        <table
+          class="w-full text-sm"
+          :class="
+            resultList.length
+              ? 'min-w-[950px]'
+              : 'table-fixed [overflow-wrap:anywhere] max-sm:[&_th]:px-1'
+          "
+        >
           <thead class="sticky top-0 z-10 border-b border-gray-200 bg-gray-50">
             <tr>
               <!-- 불러온 항목 일괄 선택 -->
-              <th v-if="authStore.isAdmin" class="px-4 py-3 text-center">
+              <th
+                v-if="authStore.isAdmin"
+                class="px-4 py-3 text-center"
+                :class="{ 'w-12': !resultList.length }"
+              >
                 <input
                   type="checkbox"
                   :checked="isBulkSelectionComplete"
@@ -785,10 +786,16 @@ onUnmounted(() => {
               </td>
             </tr>
 
-            <!-- 조회된 데이터가 없는 경우 -->
-            <tr v-if="resultList.length === 0">
-              <td :colspan="authStore.isAdmin ? 9 : 8" class="px-4 py-10 text-center text-gray-500">
-                조회된 가공 결과가 없습니다.
+            <!-- 목록 안내 -->
+            <tr v-if="!resultList.length && (!selectedModelId || isLoadingResults || currentPage > 0)">
+              <td :colspan="authStore.isAdmin ? 9 : 8" class="px-4 py-8 text-center text-gray-500">
+                <template v-if="!selectedModelId">
+                  적재 모델을 선택하면 가공 결과 목록이 표시됩니다.
+                </template>
+                <span v-else-if="isLoadingResults" role="status">
+                  가공 결과를 불러오는 중입니다.
+                </span>
+                <template v-else>조회된 가공 결과가 없습니다.</template>
               </td>
             </tr>
           </tbody>
