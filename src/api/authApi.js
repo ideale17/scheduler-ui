@@ -7,6 +7,14 @@ export const loginUser = (username, password) => {
   })
 }
 
+export const getGuestLoginEnabled = () => {
+  return http.get('/auth/guest-login-enabled')
+}
+
+export const loginGuest = () => {
+  return http.post('/auth/guest-login')
+}
+
 export const logoutUser = () => {
   return http.post('/auth/logout')
 }

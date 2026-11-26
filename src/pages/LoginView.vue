@@ -1,6 +1,6 @@
 <script setup>
 import { onMounted, ref } from 'vue'
-import { getSignupEnabled } from '@/api/authApi'
+import { getGuestLoginEnabled, getSignupEnabled } from '@/api/authApi'
 import { useAuthStore } from '@/stores/authStore'
 import { useRouter, useRoute } from 'vue-router'
 
@@ -11,31 +11,55 @@ const username = ref('')
 const password = ref('')
 const err = ref('')
 const signupEnabled = ref(false)
-const isLoggingIn = ref(false)
+const guestLoginEnabled = ref(false)
+const loginMode = ref(null)
 
-const login = async () => {
+const login = async (mode) => {
   // 로그인 요청이 진행 중이면 중복 요청을 방지한다.
-  if (isLoggingIn.value) {
+  if (loginMode.value || (mode === 'guest' && !guestLoginEnabled.value)) {
     return
   }
 
   err.value = ''
-  isLoggingIn.value = true
+  loginMode.value = mode
 
   try {
-    // 서버 로그인 후 현재 사용자 정보를 Pinia에 저장한다.
-    await authStore.login(username.value, password.value)
+    if (mode === 'guest') {
+      await authStore.loginAsGuest()
+      await router.replace('/')
 
-    // 로그인 전 접근하려던 화면이 있으면 해당 화면으로 이동한다.
-    const redirect = route.query.redirect?.toString() || '/'
-    await router.replace(redirect)
-  } catch {
-    err.value = '로그인 실패'
+      // 서버가 세션을 확인하지 못하면 라우터가 로그인 화면으로 돌려보낸다.
+      if (router.currentRoute.value.path === '/login') {
+        err.value = '게스트 로그인 세션을 확인하지 못했습니다. 다시 시도해 주세요.'
+      }
+    } else {
+      await authStore.login(username.value, password.value)
+      await router.replace(route.query.redirect?.toString() || '/')
+    }
+  } catch (error) {
+    if (mode === 'guest') {
+      if (error.response?.status === 404) {
+        guestLoginEnabled.value = false
+        err.value = '현재 게스트 로그인을 사용할 수 없습니다.'
+      } else {
+        err.value = '게스트 로그인에 실패했습니다. 다시 시도해 주세요.'
+      }
+    } else {
+      err.value = '로그인 실패'
+    }
   } finally {
-    // 로그인 처리 완료 후 버튼을 다시 활성화한다.
-    isLoggingIn.value = false
+    loginMode.value = null
   }
 }
+
+onMounted(async () => {
+  try {
+    const { data } = await getGuestLoginEnabled()
+    guestLoginEnabled.value = data?.guestLoginEnabled === true
+  } catch {
+    guestLoginEnabled.value = false
+  }
+})
 
 onMounted(async () => {
   try {
@@ -58,7 +82,7 @@ onMounted(async () => {
       </div>
 
       <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <form class="space-y-4" @submit.prevent="login">
+        <form class="space-y-4" @submit.prevent="login('account')">
           <div>
             <h2 class="text-lg font-semibold text-gray-900">로그인</h2>
 
@@ -97,6 +121,7 @@ onMounted(async () => {
 
           <div
             v-if="err"
+            role="alert"
             class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600"
           >
             {{ err }}
@@ -104,20 +129,31 @@ onMounted(async () => {
 
           <button
             type="submit"
-            :disabled="isLoggingIn"
-            :aria-busy="isLoggingIn"
+            :disabled="loginMode !== null"
+            :aria-busy="loginMode === 'account'"
             class="w-full rounded-md bg-gray-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <span class="inline-flex items-center gap-2">
               <!-- 로그인 요청 중 로딩 표시 -->
               <span
-                v-if="isLoggingIn"
+                v-if="loginMode === 'account'"
                 class="h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-white"
                 aria-hidden="true"
               ></span>
 
-              {{ isLoggingIn ? '로그인 중...' : '로그인' }}
+              {{ loginMode === 'account' ? '로그인 중...' : '로그인' }}
             </span>
+          </button>
+
+          <button
+            v-if="guestLoginEnabled"
+            type="button"
+            :disabled="loginMode !== null"
+            :aria-busy="loginMode === 'guest'"
+            class="w-full rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            @click="login('guest')"
+          >
+            {{ loginMode === 'guest' ? '게스트 로그인 중...' : '게스트 로그인' }}
           </button>
 
           <button

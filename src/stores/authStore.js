@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { getCurrentUser, loginUser, logoutUser } from '@/api/authApi'
+import { getCurrentUser, loginGuest, loginUser, logoutUser } from '@/api/authApi'
 
 export const useAuthStore = defineStore('auth', () => {
   // 1. 서버에서 확인한 로그인 사용자 정보를 관리한다.
@@ -58,8 +58,12 @@ export const useAuthStore = defineStore('auth', () => {
 
     // 2. 기존 인증 상태를 초기화한다.
     // 이후 Router에서 새로운 세션의 사용자 정보를 확인한다.
-    user.value = null
-    isInitialized.value = false
+    clearUser()
+  }
+
+  const loginAsGuest = async () => {
+    await loginGuest()
+    clearUser()
   }
 
   /**
@@ -91,6 +95,7 @@ export const useAuthStore = defineStore('auth', () => {
     isAdmin,
     loadCurrentUser,
     login,
+    loginAsGuest,
     logout,
     clearUser,
   }
