@@ -9,6 +9,7 @@ import { getAnalysisLoadList, createAnalysisLoadSources } from '@/api/analysisLo
 const route = useRoute()
 const authStore = useAuthStore()
 const toastStore = useToastStore()
+const showTaskRegistration = computed(() => authStore.isAdmin || authStore.isGuest)
 
 const inputClass =
   'w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-gray-500'
@@ -393,8 +394,8 @@ watch(
  * 가공 결과를 선택하거나 선택 해제한다.
  */
 const toggleResultSelection = (result) => {
-  // 1. 관리자 권한과 선택 가능 여부를 확인한다.
-  if (!authStore.isAdmin || !canToggleResult(result)) {
+  // 1. 등록 대상 선택을 표시하는 역할과 항목의 선택 가능 여부를 확인한다.
+  if (!showTaskRegistration.value || !canToggleResult(result)) {
     return
   }
 
@@ -417,7 +418,7 @@ const toggleResultSelection = (result) => {
  * 불러온 목록의 적재 가능 항목을 한도까지 선택하거나 선택을 해제한다.
  */
 const toggleLoadedResultsSelection = () => {
-  if (!authStore.isAdmin || isRegistering.value || selectableResults.value.length === 0) {
+  if (!showTaskRegistration.value || isRegistering.value || selectableResults.value.length === 0) {
     return
   }
 
@@ -670,9 +671,9 @@ onUnmounted(() => {
 
           <p class="mt-1 text-xs text-gray-500">
             전체 {{ totalCount }}건
-            <template v-if="authStore.isAdmin"> · {{ selectedResults.length }}건 선택 </template>
+            <template v-if="showTaskRegistration"> · {{ selectedResults.length }}건 선택 </template>
           </p>
-          <p v-if="authStore.isAdmin" role="status" class="text-xs text-gray-600">
+          <p v-if="showTaskRegistration" role="status" class="text-xs text-gray-600">
             <template v-if="remainingSelectionCount === 0">
               한 번에 최대 {{ maxSelectionCount }}건까지 등록할 수 있습니다.
             </template>
@@ -697,7 +698,7 @@ onUnmounted(() => {
             <tr>
               <!-- 불러온 항목 일괄 선택 -->
               <th
-                v-if="authStore.isAdmin"
+                v-if="showTaskRegistration"
                 class="px-4 py-3 text-center"
                 :class="{ 'w-12': !resultList.length }"
               >
@@ -733,7 +734,7 @@ onUnmounted(() => {
               class="hover:bg-gray-50"
             >
               <!-- 가공 결과 선택 -->
-              <td v-if="authStore.isAdmin" class="px-4 py-3 text-center">
+              <td v-if="showTaskRegistration" class="px-4 py-3 text-center">
                 <input
                   type="checkbox"
                   :checked="selectedResultIds.includes(result.transformResultId)"
@@ -788,7 +789,7 @@ onUnmounted(() => {
 
             <!-- 목록 안내 -->
             <tr v-if="!resultList.length && (!selectedModelId || isLoadingResults || currentPage > 0)">
-              <td :colspan="authStore.isAdmin ? 9 : 8" class="px-4 py-8 text-center text-gray-500">
+              <td :colspan="showTaskRegistration ? 9 : 8" class="px-4 py-8 text-center text-gray-500">
                 <template v-if="!selectedModelId">
                   적재 모델을 선택하면 가공 결과 목록이 표시됩니다.
                 </template>
@@ -833,7 +834,7 @@ onUnmounted(() => {
     </section>
 
     <!-- ④ 적재 작업 등록 -->
-    <section v-if="authStore.isAdmin" class="rounded-lg border border-gray-200 bg-white p-4">
+    <section v-if="showTaskRegistration" class="rounded-lg border border-gray-200 bg-white p-4">
       <div class="mb-4 flex items-center justify-between">
         <h3 class="text-sm font-semibold text-gray-900">④ 데이터 적재 작업 등록</h3>
 
@@ -892,8 +893,8 @@ onUnmounted(() => {
       <div class="mt-4 flex justify-end">
         <button
           type="button"
-          :disabled="isRegistering || isLoadingResults || isLoadingMore"
-          class="rounded-md bg-gray-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+          :disabled="!authStore.isAdmin || isRegistering || isLoadingResults || isLoadingMore"
+          class="rounded-md bg-gray-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
           @click="registerAnalysisLoads"
         >
           {{ isRegistering ? '등록 중...' : `선택 ${selectedResults.length}건 적재 등록` }}

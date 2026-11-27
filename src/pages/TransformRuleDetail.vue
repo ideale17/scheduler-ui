@@ -145,8 +145,9 @@ onMounted(() => {
     <!-- 상단 작업 영역 -->
     <div class="flex justify-end gap-2">
       <button
-        v-if="authStore.isAdmin && detail"
+        v-if="detail && (authStore.isAdmin || authStore.isGuest)"
         type="button"
+        :disabled="!authStore.isAdmin"
         class="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
         @click="router.push(`/transform-rule/${getRuleId()}/edit`)"
       >

@@ -10,6 +10,7 @@ import { createManualTransformTasks, getTransformTaskHistory } from '@/api/trans
 // 화면 상태
 const router = useRouter()
 const authStore = useAuthStore()
+const showTaskRegistration = computed(() => authStore.isAdmin || authStore.isGuest)
 
 const externalApiList = ref([])
 const transformRuleList = ref([])
@@ -408,6 +409,8 @@ const formatDateTime = (dateTime) => {
 
 // 수동 가공 작업 등록
 const registerTransformTasks = async () => {
+  if (!authStore.isAdmin) return
+
   // 1. 필수 입력값을 검증한다.
   if (!selectedExternalApiId.value || !selectedTransformRuleId.value) {
     alert('External API와 가공 규칙을 선택해 주세요.')
@@ -584,14 +587,14 @@ onUnmounted(() => {
       >
         <div>
           <h3 class="text-sm font-semibold text-gray-900">
-            {{ authStore.isAdmin ? '② 가공 대상 선택' : '② 가공 대상 조회' }}
+            {{ showTaskRegistration ? '② 가공 대상 선택' : '② 가공 대상 조회' }}
           </h3>
 
           <p class="mt-1 text-xs text-gray-500">
             전체 {{ totalCount }}건
-            <template v-if="authStore.isAdmin"> · {{ selectedRawDataIds.length }}건 선택 </template>
+            <template v-if="showTaskRegistration"> · {{ selectedRawDataIds.length }}건 선택 </template>
           </p>
-          <p v-if="authStore.isAdmin" role="status" class="text-xs text-gray-600">
+          <p v-if="showTaskRegistration" role="status" class="text-xs text-gray-600">
             <template v-if="remainingRawDataSelectionCount === 0">
               한 번에 최대 {{ maxRawDataSelectionCount }}건까지 등록할 수 있습니다.
             </template>
@@ -614,7 +617,11 @@ onUnmounted(() => {
         >
           <thead class="sticky top-0 z-10 bg-gray-50 text-gray-600">
             <tr>
-              <th v-if="authStore.isAdmin" class="px-4 py-3" :class="{ 'w-12': !rawDataList.length }">
+              <th
+                v-if="showTaskRegistration"
+                class="px-4 py-3"
+                :class="{ 'w-12': !rawDataList.length }"
+              >
                 <input
                   type="checkbox"
                   :checked="isBulkRawDataSelected"
@@ -643,7 +650,7 @@ onUnmounted(() => {
             <template v-for="item in rawDataList" :key="item.rawDataId">
               <!-- Raw Data 행 -->
               <tr class="hover:bg-gray-50">
-                <td v-if="authStore.isAdmin" class="px-4 py-3">
+                <td v-if="showTaskRegistration" class="px-4 py-3">
                   <input
                     type="checkbox"
                     :checked="selectedRawDataIds.includes(item.rawDataId)"
@@ -715,7 +722,7 @@ onUnmounted(() => {
 
               <!-- Raw Data별 가공 작업 이력 -->
               <tr v-if="expandedRawDataId === item.rawDataId">
-                <td :colspan="authStore.isAdmin ? 8 : 7" class="bg-gray-50 px-6 py-4">
+                <td :colspan="showTaskRegistration ? 8 : 7" class="bg-gray-50 px-6 py-4">
                   <div class="rounded-lg border border-gray-200 bg-white p-4">
                     <h4 class="mb-3 text-sm font-semibold text-gray-900">
                       Raw Data #{{ item.rawDataId }} 가공 이력
@@ -817,7 +824,7 @@ onUnmounted(() => {
 
             <!-- 목록 안내 -->
             <tr v-if="rawDataList.length === 0">
-              <td :colspan="authStore.isAdmin ? 8 : 7" class="px-4 py-8 text-center text-gray-500">
+              <td :colspan="showTaskRegistration ? 8 : 7" class="px-4 py-8 text-center text-gray-500">
                 <template v-if="!selectedExternalApiId">
                   External API를 선택하면 가공 대상 Raw Data가 표시됩니다.
                 </template>
@@ -865,7 +872,7 @@ onUnmounted(() => {
     </div>
 
     <!-- ③ 가공 작업 등록 -->
-    <div v-if="authStore.isAdmin" class="rounded-lg border border-gray-200 bg-white p-4">
+    <div v-if="showTaskRegistration" class="rounded-lg border border-gray-200 bg-white p-4">
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h3 class="text-sm font-semibold text-gray-900">③ 가공 작업 등록</h3>
 
@@ -930,6 +937,7 @@ onUnmounted(() => {
         <button
           type="button"
           :disabled="
+            !authStore.isAdmin ||
             isRegistering ||
             isRawDataLoading ||
             isLoadingMore ||

@@ -131,6 +131,8 @@ const getTargetTableLabel = (model) => {
  * 데이터 적재 모델 등록 화면으로 이동한다.
  */
 const goToAdd = () => {
+  if (!authStore.isAdmin) return
+
   router.push('/analysis-model/add')
 }
 
@@ -204,10 +206,11 @@ onMounted(() => {
     </section>
 
     <!-- 데이터 적재 모델 등록 -->
-    <div v-if="authStore.isAdmin" class="flex justify-end">
+    <div v-if="authStore.isAdmin || authStore.isGuest" class="flex justify-end">
       <button
         type="button"
-        class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
+        :disabled="!authStore.isAdmin"
+        class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
         @click="goToAdd"
       >
         데이터 적재 모델 등록
