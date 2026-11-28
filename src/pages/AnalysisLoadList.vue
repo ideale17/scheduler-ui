@@ -22,6 +22,7 @@ const selectedVersion = ref(null)
 const transformVersionNo = ref(null)
 
 // 2. 적재 대상 조회
+const registeredLoadStatuses = ['PENDING', 'RUNNING', 'SUCCESS', 'FAILED']
 const searchForm = ref({
   startDate: '',
   endDate: '',
@@ -642,6 +643,9 @@ onUnmounted(() => {
           <select id="analysis-load-status" v-model="searchForm.loadStatus" :class="inputClass">
             <option value="ALL">전체</option>
             <option value="UNREGISTERED">미등록</option>
+            <option v-for="status in registeredLoadStatuses" :key="status" :value="status">
+              {{ getAnalysisLoadStatusLabel(status) }}
+            </option>
           </select>
         </div>
       </div>
