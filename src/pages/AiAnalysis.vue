@@ -390,9 +390,9 @@ onUnmounted(() => {
       </div>
 
       <form @submit.prevent="fetchAnalysisDataset">
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div class="flex flex-wrap items-end gap-x-4 gap-y-3">
           <!-- External API -->
-          <div>
+          <div class="min-w-0 flex-[1_1_9rem]">
             <label class="mb-1 block text-sm font-medium text-gray-700"> External API </label>
             <select
               v-model="searchCondition.externalApiId"
@@ -411,7 +411,7 @@ onUnmounted(() => {
           </div>
 
           <!-- 가공 규칙 -->
-          <div>
+          <div class="min-w-0 flex-[1_1_9rem]">
             <label class="mb-1 block text-sm font-medium text-gray-700"> 가공 규칙 </label>
             <select
               v-model="searchCondition.transformRuleId"
@@ -430,7 +430,7 @@ onUnmounted(() => {
           </div>
 
           <!-- 가공 규칙 버전 -->
-          <div>
+          <div class="min-w-0 flex-[1_1_9rem]">
             <label class="mb-1 block text-sm font-medium text-gray-700"> 규칙 버전 </label>
             <select
               v-model="searchCondition.versionNo"
@@ -451,7 +451,7 @@ onUnmounted(() => {
           </div>
 
           <!-- 분석 시작일 -->
-          <div>
+          <div class="min-w-0 flex-[1_1_9rem]">
             <label class="mb-1 block text-sm font-medium text-gray-700"> 분석 시작일 </label>
             <input
               v-model="searchCondition.startDate"
@@ -461,7 +461,7 @@ onUnmounted(() => {
           </div>
 
           <!-- 분석 종료일 -->
-          <div>
+          <div class="min-w-0 flex-[1_1_9rem]">
             <label class="mb-1 block text-sm font-medium text-gray-700"> 분석 종료일 </label>
             <input
               v-model="searchCondition.endDate"
@@ -469,29 +469,29 @@ onUnmounted(() => {
               class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-gray-500"
             />
           </div>
+
+          <div class="ml-auto flex max-w-full flex-wrap justify-end gap-2 whitespace-nowrap">
+            <button
+              type="button"
+              :disabled="isLoading"
+              class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              @click="resetSearchCondition"
+            >
+              초기화
+            </button>
+            <button
+              type="submit"
+              :disabled="isLoading || isOptionsLoading || isVersionLoading"
+              class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
+            >
+              {{ isLoading ? '조회 중...' : '분석 대상 조회' }}
+            </button>
+          </div>
         </div>
 
         <p class="mt-3 text-xs text-gray-500">
           가공 결과 생성일 기준이며, 최대 31일까지 조회할 수 있습니다.
         </p>
-
-        <div class="mt-4 flex justify-end gap-2">
-          <button
-            type="button"
-            :disabled="isLoading"
-            class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-            @click="resetSearchCondition"
-          >
-            초기화
-          </button>
-          <button
-            type="submit"
-            :disabled="isLoading || isOptionsLoading || isVersionLoading"
-            class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
-          >
-            {{ isLoading ? '조회 중...' : '분석 대상 조회' }}
-          </button>
-        </div>
       </form>
     </section>
 

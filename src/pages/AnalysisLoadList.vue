@@ -623,20 +623,20 @@ onUnmounted(() => {
     <section class="rounded-lg border border-gray-200 bg-white p-4">
       <h3 class="mb-4 text-sm font-semibold text-gray-900">② 가공 결과 조회</h3>
 
-      <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div>
+      <div class="flex flex-wrap items-end gap-x-4 gap-y-3">
+        <div class="min-w-0 flex-[1_1_9rem]">
           <label class="mb-1 block text-sm font-medium text-gray-700"> 가공 시작일 </label>
 
           <input v-model="searchForm.startDate" type="date" :class="inputClass" />
         </div>
 
-        <div>
+        <div class="min-w-0 flex-[1_1_9rem]">
           <label class="mb-1 block text-sm font-medium text-gray-700"> 가공 종료일 </label>
 
           <input v-model="searchForm.endDate" type="date" :class="inputClass" />
         </div>
 
-        <div>
+        <div class="min-w-0 flex-[1_1_9rem]">
           <label for="analysis-load-status" class="mb-1 block text-sm font-medium text-gray-700">
             적재 상태
           </label>
@@ -648,26 +648,26 @@ onUnmounted(() => {
             </option>
           </select>
         </div>
-      </div>
 
-      <div class="mt-4 flex justify-end gap-2">
-        <button
-          type="button"
-          :disabled="isLoadingResults || isRegistering"
-          class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-          @click="resetSearch"
-        >
-          초기화
-        </button>
+        <div class="ml-auto flex max-w-full flex-wrap justify-end gap-2 whitespace-nowrap">
+          <button
+            type="button"
+            :disabled="isLoadingResults || isRegistering"
+            class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            @click="resetSearch"
+          >
+            초기화
+          </button>
 
-        <button
-          type="button"
-          :disabled="isLoadingResults || isRegistering"
-          class="rounded-md bg-gray-900 px-4 py-2 text-sm text-white hover:bg-gray-700 disabled:opacity-50"
-          @click="searchResults"
-        >
-          {{ isLoadingResults ? '조회 중...' : '조회' }}
-        </button>
+          <button
+            type="button"
+            :disabled="isLoadingResults || isRegistering"
+            class="rounded-md bg-gray-900 px-4 py-2 text-sm text-white hover:bg-gray-700 disabled:opacity-50"
+            @click="searchResults"
+          >
+            {{ isLoadingResults ? '조회 중...' : '조회' }}
+          </button>
+        </div>
       </div>
     </section>
 

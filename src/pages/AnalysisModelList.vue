@@ -154,9 +154,9 @@ onMounted(() => {
     <!-- 조회조건 -->
     <section class="rounded-lg border border-gray-200 bg-white p-4">
       <form @submit.prevent="fetchAnalysisModelList">
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div class="flex flex-wrap items-end gap-x-4 gap-y-3">
           <!-- 모델명 -->
-          <div>
+          <div class="min-w-0 flex-[1_1_9rem]">
             <label class="mb-1 block text-sm font-medium text-gray-700"> 모델명 </label>
 
             <input
@@ -169,7 +169,7 @@ onMounted(() => {
           </div>
 
           <!-- 사용 여부 -->
-          <div>
+          <div class="min-w-0 flex-[1_1_9rem]">
             <label class="mb-1 block text-sm font-medium text-gray-700"> 사용 여부 </label>
 
             <select
@@ -181,26 +181,26 @@ onMounted(() => {
               <option value="N">미사용</option>
             </select>
           </div>
-        </div>
 
-        <!-- 검색 버튼 -->
-        <div class="mt-4 flex justify-end gap-2">
-          <button
-            type="button"
-            :disabled="isLoading"
-            class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-            @click="resetSearch"
-          >
-            초기화
-          </button>
+          <!-- 검색 버튼 -->
+          <div class="ml-auto flex max-w-full flex-wrap justify-end gap-2 whitespace-nowrap">
+            <button
+              type="button"
+              :disabled="isLoading"
+              class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              @click="resetSearch"
+            >
+              초기화
+            </button>
 
-          <button
-            type="submit"
-            :disabled="isLoading"
-            class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {{ isLoading ? '조회 중...' : '조회' }}
-          </button>
+            <button
+              type="submit"
+              :disabled="isLoading"
+              class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {{ isLoading ? '조회 중...' : '조회' }}
+            </button>
+          </div>
         </div>
       </form>
     </section>
