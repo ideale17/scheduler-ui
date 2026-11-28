@@ -32,6 +32,13 @@ const totalCount = ref(0)
 
 const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / pageSize)))
 
+const visiblePages = computed(() => {
+  const pageCount = Math.min(5, totalPages.value)
+  const firstPage = Math.max(1, Math.min(currentPage.value - 2, totalPages.value - pageCount + 1))
+
+  return Array.from({ length: pageCount }, (_, index) => firstPage + index)
+})
+
 const startRow = computed(() => {
   if (resultList.value.length === 0) {
     return 0
@@ -51,6 +58,7 @@ const endRow = computed(() => {
 // 3. 화면 상태
 const isLoadingModels = ref(false)
 const isLoadingResults = ref(false)
+const hasSearched = ref(false)
 const errorMessage = ref('')
 
 // 이전 조회 요청의 응답이 뒤늦게 반영되지 않도록 관리한다.
@@ -159,7 +167,7 @@ const fetchAnalysisLoadResults = async () => {
 /**
  * 조회 대상 적재 모델을 변경한다.
  */
-const changeModel = async () => {
+const changeModel = () => {
   // 1. 이전 조회 요청을 무효화한다.
   ++resultRequestId
 
@@ -170,12 +178,21 @@ const changeModel = async () => {
   currentPage.value = 1
 
   isLoadingResults.value = false
+  hasSearched.value = false
   errorMessage.value = ''
+}
 
-  // 3. 선택한 적재 모델의 실제 저장 데이터를 조회한다.
-  if (selectedModelId.value) {
-    await fetchAnalysisLoadResults()
+/**
+ * 선택한 적재 모델을 첫 페이지부터 조회한다.
+ */
+const searchResults = () => {
+  if (!selectedModelId.value || isLoadingResults.value) {
+    return
   }
+
+  currentPage.value = 1
+  hasSearched.value = true
+  return fetchAnalysisLoadResults()
 }
 
 /**
@@ -190,7 +207,7 @@ const changePage = (page) => {
   // 2. 변경된 페이지의 적재 데이터를 조회한다.
   currentPage.value = page
 
-  fetchAnalysisLoadResults()
+  return fetchAnalysisLoadResults()
 }
 
 /**
@@ -260,6 +277,17 @@ onUnmounted(() => {
           </div>
         </div>
       </div>
+
+      <div class="mt-4 flex justify-end">
+        <button
+          type="button"
+          :disabled="!selectedModelId || isLoadingModels || isLoadingResults"
+          class="rounded-md bg-gray-900 px-4 py-2 text-sm text-white hover:bg-gray-700 disabled:opacity-50"
+          @click="searchResults"
+        >
+          {{ isLoadingResults ? '조회 중...' : '조회' }}
+        </button>
+      </div>
     </section>
 
     <!-- 오류 메시지 -->
@@ -273,15 +301,13 @@ onUnmounted(() => {
 
     <!-- 저장된 데이터 -->
     <section class="overflow-hidden rounded-lg border border-gray-200 bg-white">
-      <div class="flex items-center justify-between border-b border-gray-200 p-4">
+      <div class="border-b border-gray-200 p-4">
         <h3 class="text-sm font-semibold text-gray-900">저장된 데이터</h3>
-
-        <span class="text-xs text-gray-500"> 전체 {{ totalCount.toLocaleString() }}건 </span>
       </div>
 
-      <!-- 모델 미선택 -->
-      <div v-if="!selectedModelId" class="p-10 text-center text-sm text-gray-500">
-        적재 모델을 선택하면 실제 저장된 데이터가 표시됩니다.
+      <!-- 조회 전 -->
+      <div v-if="!hasSearched" class="p-10 text-center text-sm text-gray-500">
+        적재 모델을 선택한 후 조회 버튼을 눌러 주세요.
       </div>
 
       <!-- 조회 중 -->
@@ -348,34 +374,55 @@ onUnmounted(() => {
       <!-- 페이지 이동 -->
       <div
         v-if="totalCount > 0 && !errorMessage"
-        class="flex items-center justify-between border-t border-gray-200 p-4 text-sm"
+        class="grid gap-3 border-t border-gray-200 p-4 text-sm sm:grid-cols-[1fr_auto_1fr] sm:items-center"
       >
-        <span class="text-gray-500">
+        <span
+          class="text-center text-gray-500 sm:text-left"
+          :class="{ invisible: isLoadingResults }"
+        >
           {{ startRow.toLocaleString() }}-{{ endRow.toLocaleString() }}행 /
           {{ totalCount.toLocaleString() }}건
         </span>
 
-        <div class="flex items-center gap-3">
+        <nav
+          aria-label="적재 데이터 페이지"
+          class="flex flex-wrap items-center justify-center gap-2"
+        >
           <button
             type="button"
             :disabled="currentPage <= 1 || isLoadingResults"
-            class="rounded border border-gray-300 px-3 py-1.5 disabled:opacity-50"
+            class="rounded-md border border-gray-300 px-3 py-1.5 hover:bg-gray-50 disabled:opacity-40"
             @click="changePage(currentPage - 1)"
           >
             이전
           </button>
 
-          <span>{{ currentPage }} / {{ totalPages }}</span>
+          <button
+            v-for="page in visiblePages"
+            :key="page"
+            type="button"
+            :aria-current="currentPage === page ? 'page' : undefined"
+            :disabled="isLoadingResults"
+            class="min-w-9 rounded-md border px-3 py-1.5 disabled:opacity-40"
+            :class="
+              currentPage === page
+                ? 'border-gray-900 bg-gray-900 text-white'
+                : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+            "
+            @click="changePage(page)"
+          >
+            {{ page }}
+          </button>
 
           <button
             type="button"
             :disabled="currentPage >= totalPages || isLoadingResults"
-            class="rounded border border-gray-300 px-3 py-1.5 disabled:opacity-50"
+            class="rounded-md border border-gray-300 px-3 py-1.5 hover:bg-gray-50 disabled:opacity-40"
             @click="changePage(currentPage + 1)"
           >
             다음
           </button>
-        </div>
+        </nav>
       </div>
     </section>
   </div>
