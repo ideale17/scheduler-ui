@@ -25,6 +25,7 @@ const transformVersionNo = ref(null)
 const searchForm = ref({
   startDate: '',
   endDate: '',
+  loadStatus: 'ALL',
 })
 
 let appliedSearch = { ...searchForm.value }
@@ -235,11 +236,12 @@ const fetchAnalysisLoads = async (page = 1) => {
   if (!analysisModelId) return
 
   try {
-    // 2. 다음 페이지에도 최초 조회에 적용한 날짜 조건을 사용한다.
+    // 2. 다음 페이지에도 최초 조회에 적용한 날짜와 적재 상태를 사용한다.
     const { data } = await getAnalysisLoadList({
       analysisModelId,
       startDate: appliedSearch.startDate || undefined,
       endDate: appliedSearch.endDate || undefined,
+      loadStatus: appliedSearch.loadStatus,
       page,
       size: pageSize,
     })
@@ -330,7 +332,7 @@ const searchResults = () => {
     return
   }
 
-  // 3. 날짜 조건을 확정하고 첫 페이지부터 조회한다.
+  // 3. 검색 조건을 확정하고 첫 페이지부터 조회한다.
   appliedSearch = { ...searchForm.value }
   return fetchAnalysisLoads()
 }
@@ -343,6 +345,7 @@ const resetSearch = () => {
   searchForm.value = {
     startDate: '',
     endDate: '',
+    loadStatus: 'ALL',
   }
 
   // 2. 기본 조건으로 첫 페이지부터 조회한다.
@@ -619,7 +622,7 @@ onUnmounted(() => {
     <section class="rounded-lg border border-gray-200 bg-white p-4">
       <h3 class="mb-4 text-sm font-semibold text-gray-900">② 가공 결과 조회</h3>
 
-      <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
         <div>
           <label class="mb-1 block text-sm font-medium text-gray-700"> 가공 시작일 </label>
 
@@ -630,6 +633,16 @@ onUnmounted(() => {
           <label class="mb-1 block text-sm font-medium text-gray-700"> 가공 종료일 </label>
 
           <input v-model="searchForm.endDate" type="date" :class="inputClass" />
+        </div>
+
+        <div>
+          <label for="analysis-load-status" class="mb-1 block text-sm font-medium text-gray-700">
+            적재 상태
+          </label>
+          <select id="analysis-load-status" v-model="searchForm.loadStatus" :class="inputClass">
+            <option value="ALL">전체</option>
+            <option value="UNREGISTERED">미등록</option>
+          </select>
         </div>
       </div>
 
