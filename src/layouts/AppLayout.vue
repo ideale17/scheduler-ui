@@ -60,10 +60,10 @@ const menuGroups = [
     label: 'AI ANALYSIS',
     menus: [{ to: '/ai-analysis', label: 'AI 데이터 분석', match: 'aiAnalysis' }],
   },
-  {
-    label: 'SYSTEM',
-    menus: [{ to: '/schedulerInfo', label: 'Scheduler 정보', match: 'schedulerInfo' }],
-  },
+  // {
+  //   label: 'SYSTEM',
+  //   menus: [{ to: '/schedulerInfo', label: 'Scheduler 정보', match: 'schedulerInfo' }],
+  // },
 ]
 
 const isActive = (menu) => {
